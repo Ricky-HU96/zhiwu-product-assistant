@@ -8,6 +8,7 @@ import urllib.request
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from app.variants import enrich_product
+from app.catalog import extract_catalog
 from app.images import attach_images, extract_images
 
 
@@ -225,7 +226,8 @@ def extract_product(document, url):
             options.append({'dimension': dimension, 'label': label, 'asin': asin, 'price': price_node.text() if price_node else node.sale_text(),
                             'evidence': raw or label, 'selected': 'swatchSelect' in node.attrs.get('class', '') or 'selected' in node.attrs,
                             'available': False if 'swatchUnavailable' in node.attrs.get('class', '') else None})
-    return attach_images(enrich_product(product_data, options, price), extract_images(nodes, ids, product))
+    catalog = extract_catalog([''.join(c for c in n.children if isinstance(c, str)) for n in nodes if n.tag == 'script'])
+    return attach_images(enrich_product(product_data, options, price, catalog), extract_images(nodes, ids, product))
 
 
 def fetch_product(value):

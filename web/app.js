@@ -4,6 +4,52 @@ let toastTimer;
 let selectedScriptIndex = 0, scriptDrafts = [], scriptEdits = [];
 let galleryImages = [], selectedImageIndex = 0;
 let displayedProduct = null;
+const skuSession = new SkuSessionCache(sessionStorage);
+let displayedContext = {}, draftSaveTimer;
+
+function generationContext() {
+  return {audience: $('audience').value.trim(), visualCheck: $('visual-check').checked};
+}
+
+function generationActions(visible) {
+  document.querySelectorAll('[data-generate-sku]').forEach(button => { button.hidden = !visible; button.disabled = busy; });
+}
+
+function rememberCurrentSKU() {
+  if (!lastData?.product) return;
+  skuSession.remember(lastData, {drafts: scriptDrafts, edits: scriptEdits, selected: selectedScriptIndex, image: selectedImageIndex}, displayedContext);
+}
+
+function renderPendingSKU() {
+  $('angles-section').hidden = true;
+  $('script-section').hidden = true;
+  document.querySelectorAll('.analysis-nav').forEach(link => { link.hidden = true; });
+  $('download-button').disabled = true;
+  $('result-summary').textContent = '当前 SKU 的资料与图库已就绪，可直接使用旁边的按钮生成分析与口播。';
+  generationActions(true);
+  if (displayedProduct.visual_check_enabled) {
+    $('visual-status').textContent = '尚未核对';
+    $('visual-summary').textContent = '当前 SKU 尚未核对。点击下方按钮生成分析与口播，同时核对这款的图片。';
+  }
+}
+
+function restoreSKU(record, context) {
+  lastData = record.job;
+  displayedContext = context;
+  $('error-panel').hidden = true;
+  renderProduct(lastData.product);
+  if (lastData.result) {
+    renderAnalysis(lastData.result);
+    if (record.state?.drafts?.length === lastData.result.scripts.length) {
+      scriptDrafts = record.state.drafts;
+      scriptEdits = record.state.edits || scriptDrafts.map(() => false);
+      renderScript(Math.min(record.state.selected || 0, scriptDrafts.length - 1));
+    }
+    $('result-summary').textContent = lastData.result.summary + '（已恢复本次搜索缓存）';
+  } else renderPendingSKU();
+  if (galleryImages.length) selectGalleryImage(Math.min(record.state?.image || 0, galleryImages.length - 1));
+  skuSession.activate(lastData.product.url);
+}
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -52,7 +98,7 @@ function setBusy(value) {
   busy = value;
   $('analyze-button').disabled = value;
   $('demo-button').disabled = value;
-  $('generate-current-button').disabled = value;
+  document.querySelectorAll('[data-generate-sku]').forEach(button => { button.disabled = value; });
   document.querySelectorAll('button.variant-card').forEach(button => { button.disabled = value || button.dataset.canSwitch !== 'true'; });
   $('analyze-label').textContent = value ? '正在分析' : '分析商品';
   $('progress-panel').hidden = !value;
@@ -156,24 +202,24 @@ function renderProduct(product) {
     heading.append(element('h4', '', dimension), element('span', '', `${options.length} 个选项`));
     const grid = element('div', 'variant-grid');
     options.forEach(variant => {
-      const card = element('button', `variant-card${variant.selected ? ' selected' : ''}`);
+      const card = element('button', `variant-card${variant.selected ? ' selected' : ''}${variant.available === false ? ' unavailable' : ''}`);
       card.type = 'button';
       const canSwitch = !!variant.url && !variant.selected && variant.available !== false;
       card.dataset.canSwitch = String(canSwitch);
       card.disabled = busy || !canSwitch;
       card.setAttribute('aria-label', variant.selected ? `当前查看 ${variant.label}` : `查看 SKU ${variant.label}`);
       card.setAttribute('aria-pressed', String(variant.selected));
-      if (canSwitch) card.addEventListener('click', () => startAnalysis(false, {url: variant.url, inspectOnly: true, fetchMode: product.source_type === 'browser' ? 'browser' : $('fetch-mode').value}));
+      if (canSwitch) card.addEventListener('click', () => startAnalysis(false, {url: variant.url, withinSearch: true, inspectOnly: true, fetchMode: product.source_type === 'browser' ? 'browser' : $('fetch-mode').value}));
       const name = element('div', 'variant-name');
       name.append(element('strong', '', variant.label));
       if (variant.selected) name.append(element('span', 'variant-badge', '当前查看'));
       const price = variant.price;
-      card.append(name, element('p', `variant-price${price ? '' : ' unknown'}`, price?.display || '价格未展示'));
+      card.append(name, element('p', `variant-price${price ? '' : ' unknown'}`, variant.disabled_reason ? '无此组合' : price?.display || '价格未展示'));
       const notes = [];
       if (price?.kind === 'from') notes.push('选项起价，具体组合待确认');
       else if (price?.context) notes.push(price.context);
       else if (price) notes.push('页面售价');
-      if (variant.available === false) notes.push('当前不可选');
+      if (variant.available === false) notes.push(variant.disabled_reason || '当前不可选');
       else if (canSwitch) notes.push('点击查看此 SKU');
       else if (!variant.selected && !variant.url) notes.push('未取得此 SKU 的链接');
       if (notes.length) card.append(element('p', 'variant-price-note', notes.join(' · ')));
@@ -182,7 +228,7 @@ function renderProduct(product) {
     group.append(heading, grid);
     $('variants-overview').append(group);
   });
-  $('variant-notice').textContent = (product.variant_notice || '本次未读取到 SKU 选项。') + ' 点击其他选项只读取该 SKU；需要时再生成对应分析与口播。';
+  $('variant-notice').textContent = (product.variant_notice || '本次未读取到 SKU 选项。') + (product.sku_catalog?.complete ? ' 切换时保持其他规格不变，不存在的组合已置灰。' : '') + ' 本次搜索中已生成的 SKU 内容会保留。';
   $('fact-evidence').open = false;
   product.facts.forEach(fact => {
     const item = element('article', 'fact-item');
@@ -243,7 +289,7 @@ function renderGallery(product) {
     const image = element('img');
     image.src = item.url; image.alt = item.id; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
     button.append(image, element('span', '', item.id));
-    button.addEventListener('click', () => selectGalleryImage(index));
+    button.addEventListener('click', () => { selectGalleryImage(index); rememberCurrentSKU(); });
     return button;
   }));
   selectGalleryImage(0);
@@ -296,7 +342,7 @@ function renderAnalysis(result) {
   renderVisualReview(result.visual_review, lastData.product);
   $('angles-section').hidden = false;
   $('script-section').hidden = false;
-  $('generate-current-button').hidden = true;
+  generationActions(false);
   document.querySelectorAll('.analysis-nav').forEach(link => { link.hidden = false; });
   $('result-summary').textContent = result.summary;
   $('dimension-list').replaceChildren();
@@ -341,7 +387,7 @@ function renderAnalysis(result) {
     button.id = `script-tab-${index}`;
     button.setAttribute('aria-controls', 'script-version-panel');
     button.append(element('strong', '', script.title), element('span', '', script.audience));
-    button.addEventListener('click', () => renderScript(index));
+    button.addEventListener('click', () => { renderScript(index); rememberCurrentSKU(); });
     $('script-tabs').append(button);
   });
   renderScript(0);
@@ -405,14 +451,8 @@ async function pollJob(identifier) {
     if (job.status === 'done') {
       lastData = job;
       if (job.result) renderAnalysis(job.result);
-      else {
-        $('result-summary').textContent = '当前 SKU 的资料与图库已更新。点击右侧按钮，生成这款的分析与口播。';
-        $('generate-current-button').hidden = false;
-        if (job.product.visual_check_enabled) {
-          $('visual-status').textContent = '尚未核对';
-          $('visual-summary').textContent = '本次仅查看此 SKU。点击“生成当前 SKU 的分析与口播”后才会进行核对。';
-        }
-      }
+      else renderPendingSKU();
+      rememberCurrentSKU();
       sessionStorage.removeItem('zhiwu-job');
       toast(job.result ? '内容简报已完成' : '当前 SKU 资料已更新');
       return;
@@ -430,6 +470,18 @@ async function startAnalysis(demo = false, options = {}) {
     $('product-url').focus();
     return;
   }
+  rememberCurrentSKU();
+  const context = generationContext();
+  if (!options.withinSearch) skuSession.reset(context);
+  if (options.inspectOnly) {
+    const cached = skuSession.get(payload.url, context);
+    if (cached) {
+      restoreSKU(cached, context);
+      toast(cached.job.result ? '已恢复该 SKU 的分析、口播及编辑内容' : '已恢复该 SKU 的商品资料');
+      return;
+    }
+  }
+  displayedContext = context;
   setBusy(true);
   $('error-panel').hidden = true;
   $('empty-state').hidden = true;
@@ -437,7 +489,7 @@ async function startAnalysis(demo = false, options = {}) {
   $('angles-section').hidden = true;
   $('script-section').hidden = true;
   $('download-button').disabled = true;
-  $('generate-current-button').hidden = true;
+  generationActions(false);
   document.querySelectorAll('.analysis-nav').forEach(link => { link.hidden = true; });
   lastData = null;
   $('direct-error').hidden = true;
@@ -456,6 +508,7 @@ async function startAnalysis(demo = false, options = {}) {
       $('result-summary').textContent = '商品资料已保留，本次内容生成未完成。';
       $('visual-status').textContent = '未完成核对';
       $('visual-summary').textContent = '本次生成未完成，暂不能判断图文是否一致；仍可查看商品图片。';
+      generationActions(true);
     }
   } finally {
     currentJob = null;
@@ -471,9 +524,9 @@ function updateCount() {
 
 $('product-form').addEventListener('submit', event => { event.preventDefault(); startAnalysis(); });
 $('demo-button').addEventListener('click', () => startAnalysis(true));
-$('generate-current-button').addEventListener('click', () => {
-  if (displayedProduct?.url) startAnalysis(false, {url: displayedProduct.url, fetchMode: displayedProduct.source_type === 'browser' ? 'browser' : $('fetch-mode').value});
-});
+document.querySelectorAll('[data-generate-sku]').forEach(button => button.addEventListener('click', () => {
+  if (displayedProduct?.url) startAnalysis(false, {url: displayedProduct.url, withinSearch: true, fetchMode: displayedProduct.source_type === 'browser' ? 'browser' : $('fetch-mode').value});
+}));
 $('open-manual').addEventListener('click', () => { $('manual-details').open = true; $('manual-text').focus(); });
 async function browserAction(action) {
   if (!currentJob) return;
@@ -496,6 +549,8 @@ $('script-text').addEventListener('input', () => {
   scriptEdits[selectedScriptIndex] = $('script-text').value !== lastData?.result.scripts[selectedScriptIndex].script;
   updateCount();
   $('script-edit-note').textContent = '口播已手动修改，请重新核对字数、依据和镜头对应关系。';
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(rememberCurrentSKU, 350);
 });
 $('copy-button').addEventListener('click', async () => {
   const text = $('script-text').value;
@@ -526,7 +581,18 @@ $('download-button').addEventListener('click', () => {
 async function initialize() {
   await checkHealth();
   const saved = sessionStorage.getItem('zhiwu-job');
-  if (!saved) return;
+  displayedContext = skuSession.context;
+  $('audience').value = displayedContext.audience || '';
+  $('visual-check').checked = !!displayedContext.visualCheck;
+  if (!saved) {
+    const active = skuSession.active();
+    if (active) {
+      $('product-url').value = active.job.product.url;
+      if (active.job.product.source_type === 'browser') $('fetch-mode').value = 'browser';
+      restoreSKU(active, displayedContext);
+    }
+    return;
+  }
   setBusy(true);
   $('empty-state').hidden = true;
   currentJob = saved;
@@ -534,4 +600,5 @@ async function initialize() {
   catch (error) { sessionStorage.removeItem('zhiwu-job'); showError(error.message); if ($('results').hidden) $('empty-state').hidden = false; }
   finally { currentJob = null; setBusy(false); }
 }
+window.addEventListener('pagehide', rememberCurrentSKU);
 initialize();

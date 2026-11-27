@@ -86,6 +86,31 @@ DOM_SNAPSHOT = r"""() => {
     });
   });
   const images = [];
+  let variationCatalog = {};
+  const readJSON = (source, key) => {
+    const match = new RegExp('["\\\']' + key + '["\\\']\\s*:\\s*').exec(source);
+    if (!match) return undefined;
+    const start = match.index + match[0].length;
+    if (/\d/.test(source[start])) return Number(source.slice(start).match(/^\d+/)?.[0]);
+    if (!'{['.includes(source[start])) return undefined;
+    let depth = 0, quoted = false, escaped = false;
+    for (let i = start; i < source.length; i++) {
+      const c = source[i];
+      if (quoted) { if (escaped) escaped = false; else if (c === '\\') escaped = true; else if (c === '"') quoted = false; }
+      else if (c === '"') quoted = true;
+      else if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') { if (--depth === 0) { try { return JSON.parse(source.slice(start, i + 1)); } catch { return undefined; } } }
+    }
+  };
+  for (const script of document.querySelectorAll('script')) {
+    const source = script.textContent || '';
+    if (source.length > 2000000 || !/dimensionValuesDisplayData|dimensionToAsinMap/.test(source)) continue;
+    const data = {};
+    for (const key of ['dimensions','variationValues','dimensionValuesDisplayData','dimensionToAsinMap','num_total_variations']) {
+      const value = readJSON(source, key); if (value !== undefined) data[key] = value;
+    }
+    if (Array.isArray(data.dimensions) && (data.dimensionValuesDisplayData || data.dimensionToAsinMap)) { variationCatalog = data; break; }
+  }
   document.querySelectorAll('#landingImage, #imgTagWrapperId img, #altImages img, #imageBlock img, #main-image-container img').forEach(node => {
     const tile = node.closest('li');
     if (/video|spin|360/i.test(tile?.className || '') || /video|360|视频/i.test(node.alt || '')) return;
@@ -94,7 +119,7 @@ DOM_SNAPSHOT = r"""() => {
     try { Object.keys(JSON.parse(node.getAttribute('data-a-dynamic-image') || '{}')).forEach(url => images.push({url, caption})); } catch {}
   });
   const body = document.title + '\n' + (document.body?.innerText || '');
-  return {title, facts, variants, images, current_price: currentPrice,
+  return {title, facts, variants, images, variation_catalog: variationCatalog, current_price: currentPrice,
     verification: !title && /Robot Check|Enter the characters you see|verify you are a human|Click the button below to continue shopping|请完成验证|输入您看到的字符/i.test(body),
     not_found: !title && /Page Not Found|Sorry! We couldn.t find that page|Looking for something\?/i.test(body),
     loading: document.readyState !== 'complete'};
@@ -195,7 +220,7 @@ def inspect_snapshot(snapshot, current_url, expected_url):
     product = {"title": title, "url": expected_url, "fetched_at": now(), "source_type": "browser", "facts": facts,
             "missing": [label for label in ("页面价格", "页面品类", "功能描述") if not any(f["label"] == label for f in facts)],
             "notice": "资料读取自专用浏览器中渲染后的商品区域。"}
-    return attach_images(enrich_product(product, snapshot.get('variants', []), snapshot.get('current_price', '')), snapshot.get('images', [])), "ready"
+    return attach_images(enrich_product(product, snapshot.get('variants', []), snapshot.get('current_price', ''), snapshot.get('variation_catalog')), snapshot.get('images', [])), "ready"
 
 
 def wait_for_product(page, url, control, progress, timeout=WAIT_SECONDS, incomplete_timeout=INCOMPLETE_SECONDS):

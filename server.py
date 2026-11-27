@@ -108,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
             with JOBS_LOCK:
                 value = dict(JOBS.get(path.rsplit("/", 1)[-1], {}))
             return self.send_json(200 if value else 404, value or {"error": "任务不存在或已过期。"})
-        files = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css", "/product.css": "product.css", "/favicon.svg": "favicon.svg"}
+        files = {"/": "index.html", "/app.js": "app.js", "/sku-session.js": "sku-session.js", "/style.css": "style.css", "/product.css": "product.css", "/favicon.svg": "favicon.svg"}
         if path not in files:
             return self.send_json(404, {"error": "Not found"})
         file = ROOT / "web" / files[path]

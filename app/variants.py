@@ -2,6 +2,7 @@
 from decimal import Decimal, InvalidOperation
 import re
 from urllib.parse import urlsplit
+from app.catalog import resolve_options
 
 NUMBER = r'(?:\d{1,3}(?:[,.\u00a0 ]\d{3})+(?:[,.]\d{2})?|\d+(?:\s*[,.]\s*\d{2})?)'
 PRICE = re.compile(r'(?P<before>US\$|CA\$|USD|CAD|EUR|GBP|JPY|[$€£¥￥])\s*(?P<number>' + NUMBER + r')|(?P<suffix_number>' + NUMBER + r')\s*(?P<suffix>USD|CAD|EUR|GBP|JPY|€|£)', re.I)
@@ -38,7 +39,7 @@ def parse_price(value, url=''):
         return None
 
 
-def enrich_product(product, options=(), current_price=''):
+def enrich_product(product, options=(), current_price='', catalog=None):
     """Add SKU facts and same-currency observed range; attach traceable fact IDs."""
     facts = product['facts']
     source = product['source_type']
@@ -54,6 +55,8 @@ def enrich_product(product, options=(), current_price=''):
     current = parse_price(current_price, product['url'])
     current_assigned = False
     current_asin = product['url'].rstrip('/').rsplit('/', 1)[-1]
+    options, metadata = resolve_options(list(options), catalog, current_asin)
+    product['sku_catalog'] = metadata
     for option in options:
         label = re.sub(r'\s+', ' ', str(option.get('label', ''))).strip()[:180]
         dimension = str(option.get('dimension', '款式')).strip()[:50]
@@ -65,7 +68,7 @@ def enrich_product(product, options=(), current_price=''):
         if not label or label in {'选择', 'Select', 'Choose an option'}:
             continue
         key = (dimension, asin, label)
-        if key in seen or len(variants) >= 32:
+        if key in seen or len(variants) >= 160:
             continue
         seen.add(key)
         identity = f'V{len(variants) + 1}'
@@ -89,6 +92,7 @@ def enrich_product(product, options=(), current_price=''):
         variant_url = f'https://{host}/dp/{asin}' if asin and host else ''
         variants.append({'id': identity, 'label': label, 'dimension': dimension, 'asin': asin, 'url': variant_url,
                          'selected': selected, 'price': quote,
+                         'disabled_reason': option.get('disabled_reason', ''),
                          'available': option.get('available') if isinstance(option.get('available'), bool) else None, 'evidence_ids': [fact_id]})
         if quote and option.get('available') is not False:
             quotes.append(quote | {'variant_id': identity, 'source': f'{dimension}：{label}'})

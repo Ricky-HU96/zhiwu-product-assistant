@@ -8,6 +8,7 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/product.css">
+  <script src="/sku-session.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -29,7 +30,7 @@
         <form id="product-form">
           <label for="product-url">商品链接</label>
           <div class="url-field"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13 4-4M8 15l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 3 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 1)"/></svg><input id="product-url" name="url" type="url" placeholder="https://www.amazon.com/dp/…" autocomplete="off" aria-describedby="url-help"></div>
-          <p class="field-help" id="url-help">自动整理商品名称、功能、规格等信息；缺失内容会明确标注。</p>
+          <p class="field-help" id="url-help">自动整理商品名称、功能、规格等信息；缺失内容会明确标注。再次点击“分析商品”会开始新搜索，清空上一轮 SKU 记录。</p>
           <label for="audience">这条内容想讲给谁听？<span class="optional">可选</span></label>
           <input id="audience" name="audience" maxlength="500" placeholder="例如：周末带孩子参加户外活动的家长">
           <label class="visual-option" for="visual-check"><input type="checkbox" id="visual-check"><span><strong>启用图文核对</strong><small>可选，耗时较长。只核对当前查看的 SKU，不遍历全部规格；关闭后仍可查看商品图片。</small></span></label>
@@ -42,10 +43,10 @@
 
       <section class="progress-panel" id="progress-panel" aria-live="polite" hidden><div class="progress-top"><div class="progress-icon"></div><div><strong id="progress-message">正在获取商品信息</strong><p>从商品事实到购买理由，逐步完成分析。</p></div><span id="elapsed">0 秒</span></div><div class="progress-steps"><span id="step-fetch">获取商品信息</span><span id="step-analyze">理解购买理由</span><span id="step-script">生成与检查口播</span></div><div id="browser-panel" class="browser-panel" hidden><div class="browser-panel-heading"><span class="browser-symbol" aria-hidden="true">▣</span><div><h3 id="browser-title">正在打开商品窗口</h3><p id="browser-message">请查看本机弹出的专用浏览器窗口。</p></div><span class="subtle-pill" id="browser-timeout-label">读取最长 30 秒</span></div><p id="direct-error" class="direct-error" hidden></p><div class="browser-actions"><button type="button" class="button primary small" id="browser-check">已完成验证，重新检查</button><button type="button" class="button secondary small" id="browser-focus">显示商品窗口</button><button type="button" class="text-button" id="browser-cancel">改为粘贴资料</button></div><p class="browser-footnote">只读取当前商品的信息；不会代你填写验证码。商品信息正常显示后会自动继续。</p></div></section>
 
-      <section id="empty-state" class="empty-state"><div class="empty-top"><div class="abstract-document"><span></span><span></span><span></span><i>✦</i></div><div class="empty-eyebrow">从信息到内容</div><h2>让每个卖点，都有一个被需要的理由。</h2><p>不只告诉你商品有什么，更帮你找到该为谁、在什么场景下讲。</p></div><div class="workflow-grid"><div><span class="workflow-icon lavender">▤</span><h3>整理商品事实</h3><p>保留来源和原文依据<br>快速认识陌生商品</p></div><div><span class="workflow-icon mint">◎</span><h3>找到购买理由</h3><p>连接人群、场景与困扰<br>选出一个值得讲的角度</p></div><div><span class="workflow-icon peach">◧</span><h3>生成可拍摄口播</h3><p>150 字以内中文文案<br>搭配具体开场与镜头建议</p></div></div><div class="empty-bottom">点击「体验演示」可用虚构露营椅资料，体验已配置的 AI 生成。</div></section>
+      <section id="empty-state" class="empty-state"><div class="empty-top"><div class="abstract-document"><span></span><span></span><span></span><i>✦</i></div><div class="empty-eyebrow">从信息到内容</div><h2>让每个卖点，都有一个被需要的理由。</h2><p>不只告诉你商品有什么，更帮你找到该为谁、在什么场景下讲。</p></div><div class="workflow-grid"><div><span class="workflow-icon lavender">▤</span><h3>整理商品事实</h3><p>保留来源和原文依据<br>快速认识陌生商品</p></div><div><span class="workflow-icon mint">◎</span><h3>找到购买理由</h3><p>连接人群、场景与困扰<br>选出一个值得讲的角度</p></div><div><span class="workflow-icon peach">◧</span><h3>生成可拍摄口播</h3><p>150 字以内中文文案<br>搭配具体开场与镜头建议</p></div></div><div class="empty-bottom">点击「体验演示」可用虚构露营椅资料，体验真实 AI 生成。</div></section>
 
       <section id="results" hidden aria-label="商品分析结果">
-        <div class="result-heading"><div><div class="eyebrow">你的商品内容简报</div><h2 id="result-title"></h2><p id="result-summary"></p></div><div class="result-actions"><button type="button" class="button primary small" id="generate-current-button" hidden>生成当前 SKU 的分析与口播</button><button type="button" class="button secondary small" id="download-button" disabled>导出简报</button></div></div>
+        <div class="result-heading"><div><div class="eyebrow">你的商品内容简报</div><h2 id="result-title"></h2><p id="result-summary"></p><button type="button" id="generate-current-button" class="button primary small inline-generation" data-generate-sku hidden>生成当前 SKU 的分析与口播</button></div><div class="result-actions"><button type="button" class="button secondary small" id="download-button" disabled>导出简报</button></div></div>
         <div id="source-notice" class="source-notice"></div>
         <nav class="result-nav" aria-label="结果导航"><a href="#facts-section">商品事实</a><a href="#visual-section">商品图与核对</a><a class="analysis-nav" href="#angles-section">购买理由</a><a class="analysis-nav" href="#script-section">视频口播</a></nav>
         <section class="result-card" id="facts-section">
@@ -53,7 +54,7 @@
           <p id="selected-sku-label" class="selected-sku-scope"></p>
           <div class="price-summary"><span id="price-range-label">已确认售价区间</span><strong id="price-range-value"></strong><p id="price-range-scope"></p></div>
           <section class="product-block"><h3>基础信息</h3><dl id="product-basics" class="product-properties"></dl></section>
-          <section class="product-block"><div class="product-block-heading"><h3>SKU 选项与价格</h3><span id="variant-count" class="product-count"></span></div><p id="variant-notice" class="product-note"></p><div id="variants-overview"></div></section>
+          <section class="product-block"><div class="product-block-heading"><h3>SKU 选项与价格</h3><span id="variant-count" class="product-count"></span></div><p id="variant-notice" class="product-note"></p><button type="button" class="button primary small inline-generation" data-generate-sku hidden>生成当前 SKU 的分析与口播</button><div id="variants-overview"></div></section>
           <section class="product-block" id="features-block"><h3>功能与特点</h3><ul id="product-features" class="product-features"></ul><details id="product-description-details" hidden><summary id="product-description-label">更多商品说明</summary><div id="product-descriptions"></div></details></section>
           <section class="product-block" id="specs-block"><h3>详细规格</h3><dl id="product-specs" class="product-properties"></dl></section>
           <p id="missing-facts" class="missing-facts" hidden></p>
@@ -71,7 +72,7 @@
             <div id="gallery-thumbnails" class="gallery-thumbnails" role="group" aria-label="商品图片选择"></div>
           </div>
           <div class="visual-review-heading"><h3>图文核对提示</h3><span id="visual-coverage"></span></div>
-          <p id="visual-summary" class="visual-summary" aria-live="polite"></p>
+          <p id="visual-summary" class="visual-summary" aria-live="polite"></p><button type="button" class="button primary small inline-generation" data-generate-sku hidden>生成当前 SKU 的分析与口播</button><p class="product-note"><a href="#visual-check">前往输入区设置图文核对</a></p>
           <div id="visual-findings" class="visual-findings"></div>
           <p class="visual-footnote">核对范围限于本次取得的页面文字和已查看图片，不能验证实际交付。未提及不代表不包含；疑点应向商家确认后再写入口播。</p>
         </section>
