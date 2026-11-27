@@ -24,7 +24,7 @@ class ImageTests(unittest.TestCase):
                 self.assertIsNone(image_url(url))
 
     def test_gallery_deduplicates_resizes_and_limits_count(self):
-        product = attach_images({}, [URL, URL.replace('.jpg', '._SX40_.jpg')] + [URL.replace('test-coat', 'asset-' + str(i)) for i in range(20)])
+        product = attach_images({}, [URL, URL.replace('.jpg', '._SX40_.jpg'), URL.replace('m.media-amazon.com', 'images-na.ssl-images-amazon.com')] + [URL.replace('test-coat', 'asset-' + str(i)) for i in range(20)])
         self.assertEqual(len(product['images']), 12)
         self.assertEqual(product['images'][0]['id'], 'I1')
         self.assertEqual(product['images'][1]['id'], 'I2')

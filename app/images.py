@@ -31,9 +31,10 @@ def attach_images(product, candidates=()):
         if not isinstance(item, dict):
             continue
         url = image_url(item.get('url'))
-        if not url or url in seen:
+        asset = urlsplit(url).path if url else ''
+        if not url or asset in seen:
             continue
-        seen.add(url)
+        seen.add(asset)
         images.append({'id': f'I{len(images) + 1}', 'url': url, 'caption': str(item.get('caption') or '商品页面图片')[:180],
                        'scope': '页面图，所属具体 SKU 及随货配置需核对'})
         if len(images) >= MAX_IMAGES:
