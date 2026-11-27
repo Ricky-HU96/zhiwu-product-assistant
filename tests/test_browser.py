@@ -138,6 +138,18 @@ class WorkflowTests(unittest.TestCase):
         model.assert_not_called()
         self.assertEqual(server.JOBS['test']['status'], 'cancelled')
 
+    def test_sku_inspection_does_not_call_model_or_reuse_previous_check(self):
+        product = inspect_page(PRODUCT, URL, URL)[0]
+        product['vision_image_ids'] = ['I1']
+        with patch.object(server.BROWSER, 'read', return_value=product), patch('server.generate') as model:
+            server.analyze('test', {'url': URL, 'fetch_mode': 'browser', 'inspect_only': True, 'visual_check': False})
+        model.assert_not_called()
+        job = server.JOBS['test']
+        self.assertEqual(job['status'], 'done')
+        self.assertIsNone(job['result'])
+        self.assertFalse(job['product']['visual_check_enabled'])
+        self.assertEqual(job['product']['vision_image_ids'], [])
+
 
 if __name__ == '__main__':
     unittest.main()

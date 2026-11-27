@@ -35,8 +35,9 @@ def attach_images(product, candidates=()):
         if not url or asset in seen:
             continue
         seen.add(asset)
+        sku = product.get('selected_sku', {})
         images.append({'id': f'I{len(images) + 1}', 'url': url, 'caption': str(item.get('caption') or '商品页面图片')[:180],
-                       'scope': '页面图，所属具体 SKU 及随货配置需核对'})
+                       'scope': f"来源：{sku.get('label', '页面当前配置')}" + (f" · ASIN {sku['asin']}" if sku.get('asin') else '') + '；通用示意图仍需核实'})
         if len(images) >= MAX_IMAGES:
             break
     product['images'] = images
@@ -65,13 +66,7 @@ def extract_images(nodes, ids, structured_product):
                     candidates.extend({'url': key, 'caption': caption} for key in dynamic)
             except (ValueError, TypeError):
                 pass
-    # Gallery JSON carries images not yet displayed in the visible carousel.
-    for node in nodes:
-        if node.tag == 'script':
-            script = ''.join(c for c in node.children if isinstance(c, str))
-            if 'colorImages' in script or 'ImageBlockATF' in script:
-                for value in re.findall(r'"(?:hiRes|large|mainUrl)"\s*:\s*"([^"\n]+)"', script):
-                    candidates.append({'url': value.replace('\\/', '/'), 'caption': '商品图库图片（可能包含其他款式）'})
+    # Do not merge all variant galleries from page scripts into the selected SKU.
     structured = structured_product.get('image', [])
     if not isinstance(structured, list):
         structured = [structured]

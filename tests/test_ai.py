@@ -105,6 +105,14 @@ class AITests(unittest.TestCase):
         self.assertEqual(product['vision_image_ids'], [])
         self.assertIsInstance(content, str)
 
+    def test_user_opt_out_overrides_enabled_vision_config(self):
+        product = {'facts': [], 'images': [], 'vision_image_ids': ['I1'], 'visual_check_enabled': False}
+        with patch('app.ai.prepare_images') as prepare:
+            content = ai.user_content(CONFIG, product, '')
+        prepare.assert_not_called()
+        self.assertEqual(product['vision_image_ids'], [])
+        self.assertIsInstance(content, str)
+
     def test_chat_and_responses_extract_actual_output(self):
         for style, data in [
             ('chat_completions', {'choices': [{'message': {'content': '{"ok":true}'}, 'finish_reason': 'stop'}]}),

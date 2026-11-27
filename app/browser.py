@@ -70,7 +70,8 @@ DOM_SNAPSHOT = r"""() => {
       const explicit = image?.alt || node.getAttribute('data-value') || node.getAttribute('title') || raw;
       let label = explicit.replace(/^(?:Click to select|点击选择|选择)\s*[:：]?\s*/i, '').replace(money, '').replace(/\s+/g, ' ').trim();
       if (!label || label.length > 180 || seen.has(node)) return;
-      const asin = node.getAttribute('data-asin') || node.getAttribute('data-defaultasin') || (node.getAttribute('data-dp-url') || '').match(/\/dp\/([A-Z0-9]{10})/)?.[1] || '';
+      const identitySource = [node.getAttribute('data-asin'), node.getAttribute('data-defaultasin'), node.getAttribute('data-dp-url'), node.getAttribute('value'), node.querySelector('[data-asin]')?.getAttribute('data-asin'), node.querySelector('a[href*="/dp/"]')?.getAttribute('href')].filter(Boolean).join(' ');
+      const asin = identitySource.match(/\b[A-Z0-9]{10}\b/)?.[0] || '';
       if (!asin && !image && node.tagName !== 'OPTION' && !node.querySelector('.a-button-text')) return;
       seen.add(node);
       const clean = node.cloneNode(true);
@@ -91,12 +92,6 @@ DOM_SNAPSHOT = r"""() => {
     const caption = node.alt || '商品页面图片';
     [node.getAttribute('data-old-hires'), node.getAttribute('data-src'), node.currentSrc, node.src].filter(Boolean).forEach(url => images.push({url, caption}));
     try { Object.keys(JSON.parse(node.getAttribute('data-a-dynamic-image') || '{}')).forEach(url => images.push({url, caption})); } catch {}
-  });
-  document.querySelectorAll('script').forEach(node => {
-    const source = node.textContent || '';
-    if (/colorImages|ImageBlockATF/.test(source)) {
-      for (const match of source.matchAll(/"(?:hiRes|large|mainUrl)"\s*:\s*"([^"\n]+)"/g)) images.push({url:match[1].replace(/\\\//g, '/'), caption:'商品图库图片（可能包含其他款式）'});
-    }
   });
   const body = document.title + '\n' + (document.body?.innerText || '');
   return {title, facts, variants, images, current_price: currentPrice,

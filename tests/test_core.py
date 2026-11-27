@@ -88,7 +88,7 @@ class OutputTests(unittest.TestCase):
         for hook in ['球场边等孩子，怕晒？', '周末海边休息，怕晒？', '公园里坐一会儿，怕晒？']:
             body = '这把椅子自带遮阳篷，展开就能坐着休息。'
             self.result['scripts'].append({'title': hook, 'audience': '户外等候者', 'scenario': '等候', 'variant_ids': [],
-                                           'hook': hook, 'script': hook + body, 'script_evidence_ids': ['F3'],
+                                           'hook': hook, 'script': hook + body, 'script_evidence_ids': ['F3'], 'creator_notes': ['拍摄前核对实物遮阳篷结构。'],
                                            'shots': [{'visual': '等候场景', 'voiceover': hook, 'evidence_ids': []},
                                                      {'visual': '展开篷子', 'voiceover': body, 'evidence_ids': ['F3']}]})
         for index in range(2):
@@ -132,12 +132,19 @@ class OutputTests(unittest.TestCase):
         with self.assertRaises(ContentError):
             validate_result(invalid, self.product)
 
-    def test_multiple_skus_need_distinct_sku_scripts(self):
+    def test_multiple_skus_do_not_force_unsupported_variant_voiceover(self):
         invalid = copy.deepcopy(self.result)
         for script in invalid['scripts']:
             script['variant_ids'] = []
-        with self.assertRaisesRegex(ContentError, '至少两版'):
+        self.assertEqual(len(validate_result(invalid, self.product)['scripts']), 3)
+
+    def test_buyer_checklist_is_rejected_in_voiceover_but_allowed_in_creator_notes(self):
+        invalid = copy.deepcopy(self.result)
+        invalid['scripts'][0]['script'] = '看中了12V选项，先别急着下单。先问清供电接口，再决定是否购买。'
+        with self.assertRaisesRegex(ContentError, 'creator_notes'):
             validate_result(invalid, self.product)
+        self.result['scripts'][0]['creator_notes'] = ['拍摄前先问清供电接口与随货线缆。']
+        self.assertEqual(validate_result(self.result, self.product)['scripts'][0]['creator_notes'][0], '拍摄前先问清供电接口与随货线缆。')
 
 
 if __name__ == '__main__':

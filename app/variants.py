@@ -57,6 +57,8 @@ def enrich_product(product, options=(), current_price=''):
     for option in options:
         label = re.sub(r'\s+', ' ', str(option.get('label', ''))).strip()[:180]
         dimension = str(option.get('dimension', '款式')).strip()[:50]
+        if dimension == '颜色' and re.fullmatch(r'\d+(?:\.\d+)?\s*[vV](?:\s*(?:DC|USB))?', label, re.I):
+            dimension = '供电规格'
         asin = str(option.get('asin', '')).upper()
         if asin and not re.fullmatch(r'[A-Z0-9]{10}', asin):
             asin = ''
@@ -83,13 +85,19 @@ def enrich_product(product, options=(), current_price=''):
         fact_id = add_fact('SKU 选项', value, raw)
         if quote:
             quote['evidence_ids'] = [fact_id]
-        variants.append({'id': identity, 'label': label, 'dimension': dimension, 'asin': asin,
+        host = urlsplit(product['url']).hostname
+        variant_url = f'https://{host}/dp/{asin}' if asin and host else ''
+        variants.append({'id': identity, 'label': label, 'dimension': dimension, 'asin': asin, 'url': variant_url,
                          'selected': selected, 'price': quote,
                          'available': option.get('available') if isinstance(option.get('available'), bool) else None, 'evidence_ids': [fact_id]})
         if quote and option.get('available') is not False:
             quotes.append(quote | {'variant_id': identity, 'source': f'{dimension}：{label}'})
 
     product['variants'] = variants
+    selected_options = [v for v in variants if v['selected']]
+    product['selected_sku'] = {'asin': current_asin if re.fullmatch(r'[A-Z0-9]{10}', current_asin) else '',
+                               'label': ' · '.join(f"{v['dimension']}：{v['label']}" for v in selected_options) or '页面当前配置（未取得完整规格标签）',
+                               'variant_ids': [v['id'] for v in selected_options]}
     product['current_price'] = current
     if current and not current_assigned:
         quotes.append(current | {'variant_id': '', 'source': '当前商品报价'})

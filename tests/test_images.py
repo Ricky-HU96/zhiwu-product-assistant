@@ -109,6 +109,13 @@ class VisualTests(unittest.TestCase):
             validate_visual(self.review, self.product)
         validate_visual({'status': 'unavailable', 'summary': '未取得图片，未核对。', 'findings': []}, self.product)
 
+    def test_opted_out_review_is_skipped_and_cannot_report_findings(self):
+        self.product['visual_check_enabled'] = False
+        self.product['vision_image_ids'] = []
+        validate_visual({'status': 'skipped', 'summary': '用户未启用核对。', 'findings': []}, self.product)
+        with self.assertRaises(ValueError):
+            validate_visual({'status': 'unavailable', 'summary': '未取得图片。', 'findings': []}, self.product)
+
     def test_finding_requires_a_visible_image_and_explanation(self):
         changed = copy.deepcopy(self.review)
         changed['findings'][0]['image_ids'] = []

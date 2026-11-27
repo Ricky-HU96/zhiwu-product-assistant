@@ -214,7 +214,9 @@ def extract_product(document, url):
             if node.tag not in {'li', 'option'}:
                 continue
             image = next((n for n in node.walk() if n.tag == 'img'), None)
-            asin = node.attrs.get('data-asin') or node.attrs.get('data-defaultasin') or ''
+            identity_source = ' '.join(str(child.attrs.get(key, '')) for child in node.walk() for key in ('data-asin', 'data-defaultasin', 'data-dp-url', 'value', 'href'))
+            identity_match = re.search(r'\b[A-Z0-9]{10}\b', identity_source)
+            asin = identity_match[0] if identity_match else ''
             if not image and not asin and node.tag != 'option':
                 continue
             raw = node.text()

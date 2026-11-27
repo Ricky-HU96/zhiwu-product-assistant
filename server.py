@@ -52,6 +52,11 @@ def analyze(identifier, payload):
                     product = BROWSER.read(url, control, progress)
             if control.cancel.is_set():
                 raise BrowserCancelled("已结束浏览器读取，可以粘贴商品信息继续。")
+        product['visual_check_enabled'] = payload.get('visual_check', False)
+        product['vision_image_ids'] = []
+        if payload.get('inspect_only') is True:
+            update_job(identifier, product=product, result=None, status='done', message='SKU 资料已读取，尚未生成分析与口播')
+            return
         update_job(identifier, product=product, status="generating", message="商品信息已整理，正在分析购买理由")
         result = generate(product, payload.get("audience", ""), lambda status, message: update_job(identifier, status=status, message=message))
         update_job(identifier, result=result, status="done", message="分析完成")
@@ -146,6 +151,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(400, {"error": "补充信息最多 16000 字，受众说明最多 500 字。"})
             if payload.get("fetch_mode", "auto") not in ("auto", "browser", "direct"):
                 return self.send_json(400, {"error": "不支持的商品读取方式。"})
+            if any(key in payload and not isinstance(payload[key], bool) for key in ('visual_check', 'inspect_only')):
+                return self.send_json(400, {'error': '图文核对与仅查看选项应为布尔值。'})
             if payload.get("demo") is not True:
                 if payload.get("url", "").strip():
                     canonical_url(payload["url"])
@@ -153,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
                     canonical_url(payload.get("url", ""))
                 elif len(payload["manual_text"].strip()) < 40:
                     return self.send_json(400, {"error": "请至少提供 40 字商品信息，包含名称与功能。"})
-            if not health()["ready"]:
+            if not payload.get('inspect_only') and not health()["ready"]:
                 return self.send_json(503, {"error": health()["message"]})
             with JOBS_LOCK:
                 # Only one content-generation job may run at a time.

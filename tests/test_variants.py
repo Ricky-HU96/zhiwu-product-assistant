@@ -82,6 +82,17 @@ class VariantTests(unittest.TestCase):
         self.assertIsNone(product['variants'][1]['price'])
         self.assertEqual(product['price_range']['quote_count'], 1)
 
+    def test_switch_links_and_scope_use_observed_asins_only(self):
+        product = enrich_product(self.product(), [
+            {'label': '5V', 'dimension': '颜色', 'asin': 'B0CXT9RSGQ', 'price': '$20'},
+            {'label': '12V', 'dimension': '颜色', 'asin': 'B0DFH7XX19', 'price': '$40'},
+            {'label': '未知', 'asin': 'not-an-asin'}])
+        self.assertEqual(product['variants'][1]['url'], 'https://www.amazon.com/dp/B0DFH7XX19')
+        self.assertEqual(product['variants'][0]['dimension'], '供电规格')
+        self.assertEqual(product['selected_sku']['label'], '供电规格：5V')
+        self.assertEqual(product['selected_sku']['asin'], 'B0CXT9RSGQ')
+        self.assertEqual(product['variants'][2]['url'], '')
+
 
 if __name__ == '__main__':
     unittest.main()

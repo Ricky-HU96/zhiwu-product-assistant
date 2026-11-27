@@ -17,7 +17,7 @@ SHOT = obj({'visual': STRING, 'voiceover': STRING, 'evidence_ids': STRINGS})
 ANGLE = obj({key: STRING for key in ('audience', 'scenario', 'pain', 'feature', 'benefit', 'reason')}
             | {'evidence_ids': STRINGS, 'variant_ids': STRINGS})
 SCRIPT = obj({key: STRING for key in ('title', 'audience', 'scenario', 'hook', 'script')}
-             | {'variant_ids': STRINGS, 'script_evidence_ids': STRINGS, 'shots': {'type': 'array', 'items': SHOT}})
+             | {'variant_ids': STRINGS, 'script_evidence_ids': STRINGS, 'creator_notes': STRINGS, 'shots': {'type': 'array', 'items': SHOT}})
 SCHEMA = obj({
     'visual_review': VISUAL_SCHEMA,
     'summary': STRING,
@@ -91,6 +91,11 @@ def validate_result(result, product):
         shape(script, SCRIPT)
         for key in ('title', 'audience', 'scenario', 'hook', 'script'):
             text(script[key])
+        count(script['creator_notes'], 1, 4, '创作者拍摄提醒')
+        for note in script['creator_notes']:
+            text(note)
+        if re.search(r'页面(?:已?读取|报价)|已读取报价|先别急着(?:下单|购买)|先(?:核对|问清|确认)(?:供电|配置|接口)|确认配置(?:合适)?后|再决定是否|以页面为准|供货需核实', script['title'] + script['script']):
+            fail('口播混入了资料核验或选购提醒，请移至 creator_notes，正文应为可拍摄的产品展示。')
         script['hook'], script['script'] = script['hook'].strip(), script['script'].strip()
         if len(script['script']) > 150:
             fail(f"口播《{script['title']}》有 {len(script['script'])} 字，超过 150 字限制。")
@@ -104,8 +109,6 @@ def validate_result(result, product):
             fail('每版分镜口播必须按顺序完整覆盖该版文案。')
     if len({s['script'] for s in result['scripts']}) < 3:
         fail('至少三版口播需要有不同内容，不能重复。')
-    if len(variants) >= 2 and len({tuple(sorted(s['variant_ids'])) for s in result['scripts'] if s['variant_ids']}) < 2:
-        fail('已提供多种 SKU，至少两版口播必须明确对应不同 SKU，不能只替换场景。')
     for script in result['scripts']:
         script['char_count'] = len(script['script'])
     return result
@@ -119,9 +122,9 @@ INSTRUCTION = """你是电商内容人员的商品理解与中文短视频口播
 4. 整体价格只能使用 price_range 及其证据，具体选项价格使用 variants.price 及对应事实。price.kind=from 是起价，不是该 SKU 的确定售价，不能作为最高价；price_range.kind=from 时没有已确认上限。强调是已读取报价，不得声称覆盖未加载的所有 SKU；不同币种不能比较。context 表示仅当前规格组合价格，不能扩展到其他组合。没有可靠单件价格时，不算单件成本，也不推断更划算。
 5. sku_recommendations 有选项时给 2～5 项（不足可给 1 项），每项包含 variant_ids、适用受众、具体需求、选择理由和局限。不得编造未提供的颜色/尺寸。颜色可支持风格偏好或拍摄搭配的推断，不代表性别适配或排他限制；可提出面向某类女性/男性受众的创意，但应以具体偏好和场景为前提，不声称某颜色仅适合某性别。尺寸、承重等适配判断必须有实际规格支持，不能把当前选中 SKU 的规格自动套到全部变体。
 6. angles 给 3～5 个明显不同的“人群—场景—痛点—商品功能—收益”链路，首个最推荐。涉及具体 SKU 需在 variant_ids 引用且 evidence_ids 含对应 SKU 的 F 编号。没有 SKU 资料时 variant_ids=[]，按场景细分。收益是合理推断，不能承诺效果。
-7. scripts 给 3 版不同的中文口播。如果读取到2种以上选项，至少两版必须明确对应不同 SKU 并填写不同的非空variant_ids；有足够选项时三版分别对应不同选项/需求，优先覆盖颜色/图案偏好与人数/套装差异。不能因为某个选项没有价格就忽略其风格偏好价值，但其供货及价格需核实。实际选项不足才按不同受众或场景写，不能杜撰 SKU。每版 title 用选项或需求命名，写明 audience、scenario、variant_ids。每版 script 含标点及空格最多150字，建议80～120字；hook 为其完整开头，最多30字，约前5秒，用具体场景或问题抓住该版人群。不能三版只替换颜色名或同义词。
-8. 口播聚焦一个需求和一个主卖点，自然可说，避免参数堆砌、刻板印象、无依据夸张。引用具体 SKU 的口播必须在 script_evidence_ids 包含该 SKU 的事实编号；不提某个选项时可以为空 variant_ids。
-9. 每版 shots 给2～3个实际可拍镜头，voiceover按顺序拼接必须等于该版完整script。涉及商品功能的镜头须有 evidence_ids，纯场景镜头可为空。
+7. scripts 给 3 版不同的中文口播。如果不同选项的差异资料足以支持真实演示，优先至少两版对应不同 SKU 并填写相应variant_ids，覆盖颜色/图案偏好与人数/套装差异。只取得另一 SKU 的名称、供电标签或价格，不足以支持完整卖点时，不强行为其凑一版，改用已充分了解的当前 SKU 的不同需求/场景，并在creator_notes说明需切换该SKU补充资料。不能因为某个选项没有价格就忽略其风格偏好价值，但其供货及价格需核实。实际选项不足才按不同受众或场景写，不能杜撰 SKU。每版 title 用选项或需求命名，写明 audience、scenario、variant_ids。每版 script 含标点及空格最多150字，建议80～120字；hook 为其完整开头，最多30字，约前5秒，用具体场景或问题抓住该版人群。不能三版只替换颜色名或同义词。
+8. 输出给电商内容创作者使用的“可直接拍摄的产品展示视频”。script和hook是创作者面对消费者说的自然台词：具体使用困扰→有事实依据的商品细节/演示动作→消费者能理解的收益。不能写成选购顾问劝顾客查资料、核对配置或决定下单的提醒。禁止“页面读取报价”“先别急着下单”“先问清供电接口”“确认配置后再决定”等表达；默认不在口播中报动态价格。内部缺失项、供电接口、随货线缆、SKU归属与素材核对写入每版creator_notes（1～3条），供创作者拍摄前处理，不混入hook、title、script。缺少某SKU的接口/性能依据，就不承诺它，围绕有依据的结构、外观或已确认的功能展示，不靠购买前提醒或“多一个选择”等空话凑满一版。不能将当前SKU的能力假定为其他SKU共性。不能三版只替换颜色名。引用具体 SKU 的口播必须在 script_evidence_ids 包含该 SKU 的事实编号；不提某个选项时可以为空 variant_ids。
+9. 每版 shots 给2～3个实际可拍的产品/使用镜头，如手部操作、结构特写、真实摆放与展开过程。不要用“展示商品页和报价”“拍摄顾客查看选购信息”替代产品演示；拍摄前条件写creator_notes。voiceover按顺序拼接必须等于该版完整script。涉及商品功能的镜头须有 evidence_ids，纯场景镜头可为空。
 10. limitations 给2～4条购买前需核对的缺失或限制。所有人群建议、场景、收益、风格偏好判断均为分析推断。优先参考用户指定受众，但不能把用户描述当成商品能力。
 只输出 JSON，不要 Markdown。
 """

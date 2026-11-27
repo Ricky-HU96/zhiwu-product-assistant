@@ -32,6 +32,7 @@
           <p class="field-help" id="url-help">自动整理商品名称、功能、规格等信息；缺失内容会明确标注。</p>
           <label for="audience">这条内容想讲给谁听？<span class="optional">可选</span></label>
           <input id="audience" name="audience" maxlength="500" placeholder="例如：周末带孩子参加户外活动的家长">
+          <label class="visual-option" for="visual-check"><input type="checkbox" id="visual-check"><span><strong>启用图文核对</strong><small>可选，耗时较长。只核对当前查看的 SKU，不遍历全部规格；关闭后仍可查看商品图片。</small></span></label>
           <div class="fetch-mode-row"><div><label for="fetch-mode">商品读取方式</label><select id="fetch-mode" name="fetch_mode"><option value="auto">自动请求，失败后打开浏览器</option><option value="browser">直接使用浏览器读取</option><option value="direct">仅自动请求，不打开窗口</option></select></div><p id="browser-help">浏览器模式会打开专用商品窗口。遇到验证码时，由你完成验证，工具随后自动继续。</p></div>
           <details id="manual-details"><summary>遇到页面拦截？补充商品信息</summary><div class="manual-content"><label for="manual-text">商品标题、功能和规格</label><textarea id="manual-text" name="manual_text" rows="6" maxlength="16000" placeholder="粘贴商品介绍（至少 40 字）。补充后将以这些资料为分析依据，链接可以留空。"></textarea><p class="field-help">补充资料将标注为“用户提供，尚未核验”。请勿粘贴账号或个人信息。</p></div></details>
           <div class="form-footer"><span class="form-note">✦ 有依据的卖点，才值得讲。</span><div class="form-actions"><button class="button secondary" id="demo-button" type="button">体验演示</button><button class="button primary" id="analyze-button" type="submit"><span aria-hidden="true">✦</span><span id="analyze-label">分析商品</span></button></div></div>
@@ -44,11 +45,12 @@
       <section id="empty-state" class="empty-state"><div class="empty-top"><div class="abstract-document"><span></span><span></span><span></span><i>✦</i></div><div class="empty-eyebrow">从信息到内容</div><h2>让每个卖点，都有一个被需要的理由。</h2><p>不只告诉你商品有什么，更帮你找到该为谁、在什么场景下讲。</p></div><div class="workflow-grid"><div><span class="workflow-icon lavender">▤</span><h3>整理商品事实</h3><p>保留来源和原文依据<br>快速认识陌生商品</p></div><div><span class="workflow-icon mint">◎</span><h3>找到购买理由</h3><p>连接人群、场景与困扰<br>选出一个值得讲的角度</p></div><div><span class="workflow-icon peach">◧</span><h3>生成可拍摄口播</h3><p>150 字以内中文文案<br>搭配具体开场与镜头建议</p></div></div><div class="empty-bottom">点击「体验演示」可用虚构露营椅资料，体验已配置的 AI 生成。</div></section>
 
       <section id="results" hidden aria-label="商品分析结果">
-        <div class="result-heading"><div><div class="eyebrow">你的商品内容简报</div><h2 id="result-title"></h2><p id="result-summary"></p></div><button type="button" class="button secondary small" id="download-button" disabled>导出简报</button></div>
+        <div class="result-heading"><div><div class="eyebrow">你的商品内容简报</div><h2 id="result-title"></h2><p id="result-summary"></p></div><div class="result-actions"><button type="button" class="button primary small" id="generate-current-button" hidden>生成当前 SKU 的分析与口播</button><button type="button" class="button secondary small" id="download-button" disabled>导出简报</button></div></div>
         <div id="source-notice" class="source-notice"></div>
-        <nav class="result-nav" aria-label="结果导航"><a href="#facts-section">商品事实</a><a href="#visual-section">图片与描述核对</a><a href="#angles-section">购买理由</a><a href="#script-section">视频口播</a></nav>
+        <nav class="result-nav" aria-label="结果导航"><a href="#facts-section">商品事实</a><a href="#visual-section">商品图与核对</a><a class="analysis-nav" href="#angles-section">购买理由</a><a class="analysis-nav" href="#script-section">视频口播</a></nav>
         <section class="result-card" id="facts-section">
           <div class="section-title"><div><span class="section-kicker">认识商品</span><h2>商品信息，一眼看清</h2></div><span class="subtle-pill" id="fact-count"></span></div>
+          <p id="selected-sku-label" class="selected-sku-scope"></p>
           <div class="price-summary"><span id="price-range-label">已确认售价区间</span><strong id="price-range-value"></strong><p id="price-range-scope"></p></div>
           <section class="product-block"><h3>基础信息</h3><dl id="product-basics" class="product-properties"></dl></section>
           <section class="product-block"><div class="product-block-heading"><h3>SKU 选项与价格</h3><span id="variant-count" class="product-count"></span></div><p id="variant-notice" class="product-note"></p><div id="variants-overview"></div></section>
@@ -59,7 +61,8 @@
           <div id="source-link" class="source-link"></div>
         </section>
         <section class="result-card" id="visual-section">
-          <div class="section-title"><div><span class="section-kicker">核对购买预期</span><h2>商品图与描述，对得上吗？</h2></div><span id="visual-status" class="subtle-pill">待核对</span></div>
+          <div class="section-title"><div><span class="section-kicker">商品图片 · 可选核对</span><h2>查看图片，核对当前配置</h2></div><span id="visual-status" class="subtle-pill">未启用</span></div>
+          <p id="visual-sku-scope" class="selected-sku-scope"></p>
           <p class="section-description">看清部件、配件和配置差异。图片中的展示，不直接等于随货包含。</p>
           <div id="gallery-empty" class="visual-empty" hidden>本次未读取到商品图片，暂时无法进行图文核对。</div>
           <div id="product-gallery" class="product-gallery" hidden>
@@ -73,7 +76,7 @@
           <p class="visual-footnote">核对范围限于本次取得的页面文字和已查看图片，不能验证实际交付。未提及不代表不包含；疑点应向商家确认后再写入口播。</p>
         </section>
         <section class="result-card" id="angles-section" hidden><div class="section-title"><div><span class="section-kicker">理解需求</span><h2>谁，会为什么需要它？</h2></div><span class="subtle-pill inference-pill">AI 分析推断</span></div><p class="section-description">下列人群与场景是基于资料的推断，供你选择内容方向。</p><div id="dimension-list" class="insight-grid"></div><section id="sku-recommendations-section"><h3 class="subsection-title">不同 SKU，怎样对应不同需求？</h3><p class="section-description">基于已读取的选项给出选择建议，人群与偏好均为推断。</p><div id="sku-recommendations" class="sku-recommendation-grid"></div></section><h3 class="subsection-title">可以怎么讲：人群与场景角度</h3><div id="angle-list"></div><div class="limitations"><h3>购买前，还需要看清这些</h3><ul id="limitations-list"></ul></div></section>
-        <section class="result-card script-card" id="script-section" hidden><div class="section-title"><div><span class="section-kicker">开始表达</span><h2>把购买理由，讲成一条视频</h2></div><span class="subtle-pill">中文短视频口播</span></div><div id="script-tabs" class="script-tabs" role="tablist" aria-label="口播版本"></div><div id="script-version-panel" role="tabpanel"><p id="script-target" class="script-target"></p><div class="hook-box"><span>前 5 秒 · 开场钩子</span><p id="hook-text"></p></div><div class="script-label"><label for="script-text">完整口播<span class="optional">可编辑</span></label><span id="char-count" aria-live="polite"></span></div><textarea id="script-text" rows="5" aria-describedby="script-edit-note"></textarea><div class="script-footer"><span id="script-edit-note">生成结果已通过字数与依据编号检查，发布前请核对商品描述。</span><button type="button" class="button primary small" id="copy-button">复制口播</button></div><div id="script-evidence" class="evidence-row"></div><div class="shots-heading"><h3>拍摄时，可以这样配画面</h3><span>让镜头跟着文案走</span></div><div id="shots-list" class="shots-grid"></div></div></section>
+        <section class="result-card script-card" id="script-section" hidden><div class="section-title"><div><span class="section-kicker">开始表达</span><h2>把购买理由，讲成一条视频</h2></div><span class="subtle-pill">中文短视频口播</span></div><div id="script-tabs" class="script-tabs" role="tablist" aria-label="口播版本"></div><div id="script-version-panel" role="tabpanel"><p id="script-target" class="script-target"></p><div class="hook-box"><span>前 5 秒 · 开场钩子</span><p id="hook-text"></p></div><div class="script-label"><label for="script-text">完整口播<span class="optional">可编辑</span></label><span id="char-count" aria-live="polite"></span></div><textarea id="script-text" rows="5" aria-describedby="script-edit-note"></textarea><div class="script-footer"><span id="script-edit-note">生成结果已通过字数与依据编号检查，发布前请核对商品描述。</span><button type="button" class="button primary small" id="copy-button">复制口播</button></div><div id="script-evidence" class="evidence-row"></div><div class="creator-notes"><h3>拍摄前核对 · 仅供创作者</h3><p>以下是内部准备事项，不属于视频口播。</p><ul id="creator-notes-list"></ul></div><div class="shots-heading"><h3>拍摄时，可以这样配画面</h3><span>让镜头跟着文案走</span></div><div id="shots-list" class="shots-grid"></div></div></section>
       </section>
       <footer class="page-footer"><span>知物 · 先理解，再表达</span><span>商品事实有来源，内容判断有依据。</span></footer>
     </div>

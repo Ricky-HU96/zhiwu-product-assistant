@@ -108,8 +108,8 @@ def parse_output(text):
 
 def user_content(config, product, audience):
     with tempfile.TemporaryDirectory(prefix='product-images-') as folder:
-        prepared = prepare_images(product, folder) if config.vision_enabled else []
-        if not config.vision_enabled:
+        prepared = prepare_images(product, folder) if config.vision_enabled and product.get('visual_check_enabled', True) else []
+        if not config.vision_enabled or not product.get('visual_check_enabled', True):
             product['vision_image_ids'] = []
         text = json.dumps({'product': product, 'audience_or_scenario': audience[:500]}, ensure_ascii=False)
         if not prepared:
@@ -135,7 +135,7 @@ def generate(product, audience='', progress=None):
         if config.response_format != 'json_schema':
             instructions += '\n必须匹配此 JSON Schema：' + json.dumps(SCHEMA, ensure_ascii=False)
         if progress:
-            progress('generating', '正在准备商品图片与图文核对资料')
+            progress('generating', '正在准备商品图片与图文核对资料' if product.get('visual_check_enabled', True) else '正在准备商品资料，本次未启用图文核对')
         messages = [{'role': 'system', 'content': instructions},
                     {'role': 'user', 'content': user_content(config, product, audience)}]
         for attempt in range(2):
