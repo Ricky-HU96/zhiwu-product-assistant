@@ -78,7 +78,7 @@ class OutputTests(unittest.TestCase):
         self.product = manual_product(DEMO_TEXT, demo=True)
         angle = {'audience': '户外等候的家长', 'scenario': '球场边等候', 'pain': '日晒', 'feature': '带遮阳篷',
                  'benefit': '坐着休息时多一片遮挡', 'reason': '容易演示', 'evidence_ids': ['F3'], 'variant_ids': []}
-        self.result = {'summary': '带遮阳篷的折叠椅',
+        self.result = {'visual_review': {'status': 'unavailable', 'summary': '未提供商品图，未完成核对。', 'findings': []}, 'summary': '带遮阳篷的折叠椅',
                        'dimensions': [{'dimension': name, 'insight': '依据遮阳篷判断户外等候需求。', 'evidence_ids': ['F3']}
                                       for name in ['核心需求', 'SKU选择', '人群偏好', '场景', '价值', '购买顾虑']],
                        'sku_recommendations': [{'audience': '单人等候的家长', 'need': '一人使用', 'selection_reason': '单人装',

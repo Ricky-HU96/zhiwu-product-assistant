@@ -9,6 +9,7 @@
 - 产品分析：核心需求、SKU 选择、人群偏好、使用场景、价格与价值、购买顾虑等维度；保留可定位的事实依据。
 - 视频口播：三版独立受众、场景和 SKU 的中文口播，每版不超过 150 字，含开场钩子及镜头建议；支持编辑、复制和导出。
 - 获取失败时可使用浏览器辅助读取或粘贴资料。演示使用明确标记的虚构商品资料，仍会调用使用者配置的 AI。
+- 商品图库：最多显示12张商品图片，支持缩略图切换与放大。对前6张中成功取得的图片进行图文核对，显示实际核对数量，分别提示描述未说明、明确冲突、SKU/展示范围待确认，并关联图片编号及文字依据。
 
 ## 快速开始
 
@@ -52,6 +53,7 @@ macOS/Linux：使用 `.venv/bin/python`，以 `cp .env.example .env` 复制模�
 | `AI_API_STYLE` | `chat_completions` 调用 `/chat/completions`；`responses` 调用 `/responses`。 |
 | `AI_RESPONSE_FORMAT` | `json_schema`（默认）、`json_object` 或 `text`。模型不支持结构化输出时可选择后两者；所有模式均进行本地结果校验。 |
 | `AI_TIMEOUT_SECONDS` | 单次模型请求超时，10～300 秒，默认 180。格式/内容校验失败最多修订一次。 |
+| `AI_VISION_ENABLED` | 默认 `true`，需要支持图片输入的模型。纯文本模型可设 `false`，保留图库并明确标为未完成视觉核对。 |
 
 支持提供以上兼容协议的服务，并非支持所有供应商的专有接口。可参考 [Chat Completions 接口](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)及 [Responses 接口](https://developers.openai.com/api/reference/resources/responses/methods/create)确认兼容格式。
 
@@ -76,6 +78,7 @@ macOS/Linux：使用 `.venv/bin/python`，以 `cp .env.example .env` 复制模�
 - 密钥仅由后端作为认证头发送给配置的服务；不跟随模型服务重定向，不返回供应商原始报错、响应或凭证到前端，也不打印请求正文。
 - 商品资料、受众说明和生成结果会发送给使用者自己配置的 AI 服务，适用该服务的数据政策。本机运行不代表模型处理离线进行。Responses 请求使用 `store=false`；供应商的实际留存政策需自行确认。
 - 专用商品会话位于 `.browser-profile/`，可能含登录/地区信息。不要打包分享该目录或真实 `.env`。导出的简报由使用者自行保管。
+- 图片仅从允许的 Amazon 图片 CDN 读取，发送模型前检查格式与大小；临时文件随生成结束清理。图文核对只检查所读页面，不保证实物一致。未提及不代表不包含，其他 SKU、场景道具或效果图需先确认；未证实的图片卖点不得作为肯定的口播承诺。
 - 服务仅监听 `127.0.0.1`，检查同源请求，生成任务串行执行。内存中最多保留最近 20 个任务，创建新任务时清理超过 1 小时的历史，重启清空。刷新同一标签页可恢复仍在内存中的任务。
 - 本项目是本地工具。若部署到公网，需要额外实现身份认证、访问限制、配额和浏览器会话隔离，不能直接当作静态网站部署。
 

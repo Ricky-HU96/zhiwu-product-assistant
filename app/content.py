@@ -1,5 +1,6 @@
 """Grounded multi-dimensional analysis and independent short-video versions."""
 import re
+from app.visual import VISUAL_SCHEMA, VISUAL_INSTRUCTION, validate_visual
 
 
 class ContentError(ValueError):
@@ -18,6 +19,7 @@ ANGLE = obj({key: STRING for key in ('audience', 'scenario', 'pain', 'feature', 
 SCRIPT = obj({key: STRING for key in ('title', 'audience', 'scenario', 'hook', 'script')}
              | {'variant_ids': STRINGS, 'script_evidence_ids': STRINGS, 'shots': {'type': 'array', 'items': SHOT}})
 SCHEMA = obj({
+    'visual_review': VISUAL_SCHEMA,
     'summary': STRING,
     'dimensions': {'type': 'array', 'items': obj({'dimension': STRING, 'insight': STRING, 'evidence_ids': STRINGS})},
     'sku_recommendations': {'type': 'array', 'items': obj({key: STRING for key in ('audience', 'need', 'selection_reason', 'caveat')}
@@ -59,6 +61,7 @@ def validate_result(result, product):
                 fail('SKU 建议或口播必须引用对应 SKU 的原始资料。')
 
     shape(result, SCHEMA)
+    validate_visual(result['visual_review'], product)
     text(result['summary'])
     count(result['dimensions'], 5, 8, '分析维度')
     dimension_names = set()
@@ -122,3 +125,4 @@ INSTRUCTION = """你是电商内容人员的商品理解与中文短视频口播
 10. limitations 给2～4条购买前需核对的缺失或限制。所有人群建议、场景、收益、风格偏好判断均为分析推断。优先参考用户指定受众，但不能把用户描述当成商品能力。
 只输出 JSON，不要 Markdown。
 """
+INSTRUCTION += VISUAL_INSTRUCTION

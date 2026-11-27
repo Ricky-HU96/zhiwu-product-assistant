@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from app.product import HOSTS, ProductError, canonical_url, extract_product, now
 from app.variants import enrich_product
+from app.images import attach_images
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILE = ROOT / ".browser-profile"
@@ -39,6 +40,13 @@ DOM_SNAPSHOT = r"""() => {
   add('页面品类', first('#wayfinding-breadcrumbs_feature_div'));
   document.querySelectorAll('#feature-bullets li, #productFactsDesktopExpander li').forEach(n => {
     const value = text(n); if (value.length >= 10 && !/Make sure this fits/.test(value)) add('功能描述', value);
+  });
+  [['#productDescription','商品说明'], ['#aplus_feature_div','图文详情说明（需核对型号范围）']].forEach(([selector,label]) => {
+    const value = first(selector).slice(0,4800);
+    if (value.replace(/Previous page|Next page|上一页|下一页|商品描述|产品描述|-?\d+:\d+/gi,'').trim().length<20) return;
+    for (let offset=0; offset<value.length; offset+=1200) {
+      const chunk = value.slice(offset,offset+1200); if (chunk.length>=20) add(label,chunk);
+    }
   });
   document.querySelectorAll('#productDetails_techSpec_section_1 tr, #productDetails_detailBullets_sections1 tr, #productOverview_feature_div tr').forEach(row => {
     const cells = [...row.querySelectorAll('th, td')].map(text).filter(Boolean);
@@ -76,8 +84,22 @@ DOM_SNAPSHOT = r"""() => {
         available: node.matches('.swatchUnavailable, [disabled], [aria-disabled="true"]') ? false : null});
     });
   });
+  const images = [];
+  document.querySelectorAll('#landingImage, #imgTagWrapperId img, #altImages img, #imageBlock img, #main-image-container img').forEach(node => {
+    const tile = node.closest('li');
+    if (/video|spin|360/i.test(tile?.className || '') || /video|360|视频/i.test(node.alt || '')) return;
+    const caption = node.alt || '商品页面图片';
+    [node.getAttribute('data-old-hires'), node.getAttribute('data-src'), node.currentSrc, node.src].filter(Boolean).forEach(url => images.push({url, caption}));
+    try { Object.keys(JSON.parse(node.getAttribute('data-a-dynamic-image') || '{}')).forEach(url => images.push({url, caption})); } catch {}
+  });
+  document.querySelectorAll('script').forEach(node => {
+    const source = node.textContent || '';
+    if (/colorImages|ImageBlockATF/.test(source)) {
+      for (const match of source.matchAll(/"(?:hiRes|large|mainUrl)"\s*:\s*"([^"\n]+)"/g)) images.push({url:match[1].replace(/\\\//g, '/'), caption:'商品图库图片（可能包含其他款式）'});
+    }
+  });
   const body = document.title + '\n' + (document.body?.innerText || '');
-  return {title, facts, variants, current_price: currentPrice,
+  return {title, facts, variants, images, current_price: currentPrice,
     verification: !title && /Robot Check|Enter the characters you see|verify you are a human|Click the button below to continue shopping|请完成验证|输入您看到的字符/i.test(body),
     not_found: !title && /Page Not Found|Sorry! We couldn.t find that page|Looking for something\?/i.test(body),
     loading: document.readyState !== 'complete'};
@@ -178,7 +200,7 @@ def inspect_snapshot(snapshot, current_url, expected_url):
     product = {"title": title, "url": expected_url, "fetched_at": now(), "source_type": "browser", "facts": facts,
             "missing": [label for label in ("页面价格", "页面品类", "功能描述") if not any(f["label"] == label for f in facts)],
             "notice": "资料读取自专用浏览器中渲染后的商品区域。"}
-    return enrich_product(product, snapshot.get('variants', []), snapshot.get('current_price', '')), "ready"
+    return attach_images(enrich_product(product, snapshot.get('variants', []), snapshot.get('current_price', '')), snapshot.get('images', [])), "ready"
 
 
 def wait_for_product(page, url, control, progress, timeout=WAIT_SECONDS, incomplete_timeout=INCOMPLETE_SECONDS):

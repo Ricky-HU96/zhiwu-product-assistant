@@ -8,6 +8,7 @@ import urllib.request
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from app.variants import enrich_product
+from app.images import attach_images, extract_images
 
 
 class ProductError(ValueError):
@@ -180,6 +181,15 @@ def extract_product(document, url):
                 text = node.text()
                 if len(text) > 15 and "Make sure this fits" not in text:
                     add("功能描述", text)
+    for identity, label in [('productDescription', '商品说明'), ('aplus_feature_div', '图文详情说明（需核对型号范围）')]:
+        if identity in ids:
+            description = ids[identity].text()[:4800]
+            meaningful = re.sub(r'Previous page|Next page|上一页|下一页|商品描述|产品描述|-?\d+:\d+', '', description, flags=re.I).strip()
+            if len(meaningful) < 20:
+                continue
+            for offset in range(0, len(description), 1200):
+                if len(description[offset:offset + 1200]) >= 20:
+                    add(label, description[offset:offset + 1200])
     for identity in ("productDetails_techSpec_section_1", "productDetails_detailBullets_sections1", "productOverview_feature_div"):
         if identity in ids:
             for row in ids[identity].walk():
@@ -213,7 +223,7 @@ def extract_product(document, url):
             options.append({'dimension': dimension, 'label': label, 'asin': asin, 'price': price_node.text() if price_node else node.sale_text(),
                             'evidence': raw or label, 'selected': 'swatchSelect' in node.attrs.get('class', '') or 'selected' in node.attrs,
                             'available': False if 'swatchUnavailable' in node.attrs.get('class', '') else None})
-    return enrich_product(product_data, options, price)
+    return attach_images(enrich_product(product_data, options, price), extract_images(nodes, ids, product))
 
 
 def fetch_product(value):
@@ -263,4 +273,4 @@ def manual_product(text, url="", demo=False):
             label = re.split(r'[；;]\s*(?:价格|price)\s*[:：]', match[2], flags=re.I)[0]
             options.append({'dimension': '款式/套装' if match[1].upper() == 'SKU' else match[1],
                             'label': label, 'price': line, 'evidence': line})
-    return enrich_product(product_data, options)
+    return attach_images(enrich_product(product_data, options))

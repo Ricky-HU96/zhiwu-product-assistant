@@ -51,6 +51,7 @@ class AIConfig:
     api_style: str = 'chat_completions'
     response_format: str = 'json_schema'
     timeout: int = 180
+    vision_enabled: bool = True
 
 
 def load_config(path=None, environ=None):
@@ -89,4 +90,7 @@ def load_config(path=None, environ=None):
             raise ValueError()
     except ValueError:
         raise ConfigError('AI_TIMEOUT_SECONDS 应为 10～300 的整数。') from None
-    return AIConfig(base_url, key, values['AI_MODEL'].strip(), style, output, timeout)
+    vision = values.get('AI_VISION_ENABLED', 'true').lower()
+    if vision not in {'true', 'false'}:
+        raise ConfigError('AI_VISION_ENABLED 应为 true 或 false。')
+    return AIConfig(base_url, key, values['AI_MODEL'].strip(), style, output, timeout, vision == 'true')

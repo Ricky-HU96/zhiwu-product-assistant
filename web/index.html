@@ -46,17 +46,31 @@
       <section id="results" hidden aria-label="商品分析结果">
         <div class="result-heading"><div><div class="eyebrow">你的商品内容简报</div><h2 id="result-title"></h2><p id="result-summary"></p></div><button type="button" class="button secondary small" id="download-button" disabled>导出简报</button></div>
         <div id="source-notice" class="source-notice"></div>
-        <nav class="result-nav" aria-label="结果导航"><a href="#facts-section">商品事实</a><a href="#angles-section">购买理由</a><a href="#script-section">视频口播</a></nav>
+        <nav class="result-nav" aria-label="结果导航"><a href="#facts-section">商品事实</a><a href="#visual-section">图片与描述核对</a><a href="#angles-section">购买理由</a><a href="#script-section">视频口播</a></nav>
         <section class="result-card" id="facts-section">
           <div class="section-title"><div><span class="section-kicker">认识商品</span><h2>商品信息，一眼看清</h2></div><span class="subtle-pill" id="fact-count"></span></div>
           <div class="price-summary"><span id="price-range-label">已确认售价区间</span><strong id="price-range-value"></strong><p id="price-range-scope"></p></div>
           <section class="product-block"><h3>基础信息</h3><dl id="product-basics" class="product-properties"></dl></section>
           <section class="product-block"><div class="product-block-heading"><h3>SKU 选项与价格</h3><span id="variant-count" class="product-count"></span></div><p id="variant-notice" class="product-note"></p><div id="variants-overview"></div></section>
-          <section class="product-block" id="features-block"><h3>功能与特点</h3><ul id="product-features" class="product-features"></ul></section>
+          <section class="product-block" id="features-block"><h3>功能与特点</h3><ul id="product-features" class="product-features"></ul><details id="product-description-details" hidden><summary id="product-description-label">更多商品说明</summary><div id="product-descriptions"></div></details></section>
           <section class="product-block" id="specs-block"><h3>详细规格</h3><dl id="product-specs" class="product-properties"></dl></section>
           <p id="missing-facts" class="missing-facts" hidden></p>
           <details id="fact-evidence" class="fact-evidence"><summary>查看原始资料与依据编号</summary><p class="product-note">分析中的依据编号会自动定位到这里，方便核对页面原文。</p><div id="fact-list" class="fact-list"></div></details>
           <div id="source-link" class="source-link"></div>
+        </section>
+        <section class="result-card" id="visual-section">
+          <div class="section-title"><div><span class="section-kicker">核对购买预期</span><h2>商品图与描述，对得上吗？</h2></div><span id="visual-status" class="subtle-pill">待核对</span></div>
+          <p class="section-description">看清部件、配件和配置差异。图片中的展示，不直接等于随货包含。</p>
+          <div id="gallery-empty" class="visual-empty" hidden>本次未读取到商品图片，暂时无法进行图文核对。</div>
+          <div id="product-gallery" class="product-gallery" hidden>
+            <button type="button" id="gallery-open" class="gallery-main" aria-label="放大查看当前商品图片"><img id="gallery-main-image" alt="当前商品图片" referrerpolicy="no-referrer"><span>点击放大</span></button>
+            <div class="gallery-caption"><strong id="gallery-image-label"></strong><span id="gallery-image-scope"></span></div>
+            <div id="gallery-thumbnails" class="gallery-thumbnails" role="group" aria-label="商品图片选择"></div>
+          </div>
+          <div class="visual-review-heading"><h3>图文核对提示</h3><span id="visual-coverage"></span></div>
+          <p id="visual-summary" class="visual-summary" aria-live="polite"></p>
+          <div id="visual-findings" class="visual-findings"></div>
+          <p class="visual-footnote">核对范围限于本次取得的页面文字和已查看图片，不能验证实际交付。未提及不代表不包含；疑点应向商家确认后再写入口播。</p>
         </section>
         <section class="result-card" id="angles-section" hidden><div class="section-title"><div><span class="section-kicker">理解需求</span><h2>谁，会为什么需要它？</h2></div><span class="subtle-pill inference-pill">AI 分析推断</span></div><p class="section-description">下列人群与场景是基于资料的推断，供你选择内容方向。</p><div id="dimension-list" class="insight-grid"></div><section id="sku-recommendations-section"><h3 class="subsection-title">不同 SKU，怎样对应不同需求？</h3><p class="section-description">基于已读取的选项给出选择建议，人群与偏好均为推断。</p><div id="sku-recommendations" class="sku-recommendation-grid"></div></section><h3 class="subsection-title">可以怎么讲：人群与场景角度</h3><div id="angle-list"></div><div class="limitations"><h3>购买前，还需要看清这些</h3><ul id="limitations-list"></ul></div></section>
         <section class="result-card script-card" id="script-section" hidden><div class="section-title"><div><span class="section-kicker">开始表达</span><h2>把购买理由，讲成一条视频</h2></div><span class="subtle-pill">中文短视频口播</span></div><div id="script-tabs" class="script-tabs" role="tablist" aria-label="口播版本"></div><div id="script-version-panel" role="tabpanel"><p id="script-target" class="script-target"></p><div class="hook-box"><span>前 5 秒 · 开场钩子</span><p id="hook-text"></p></div><div class="script-label"><label for="script-text">完整口播<span class="optional">可编辑</span></label><span id="char-count" aria-live="polite"></span></div><textarea id="script-text" rows="5" aria-describedby="script-edit-note"></textarea><div class="script-footer"><span id="script-edit-note">生成结果已通过字数与依据编号检查，发布前请核对商品描述。</span><button type="button" class="button primary small" id="copy-button">复制口播</button></div><div id="script-evidence" class="evidence-row"></div><div class="shots-heading"><h3>拍摄时，可以这样配画面</h3><span>让镜头跟着文案走</span></div><div id="shots-list" class="shots-grid"></div></div></section>
@@ -65,5 +79,6 @@
     </div>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>
+  <dialog id="image-dialog" class="image-dialog"><button type="button" id="gallery-close" class="button secondary small">关闭大图</button><img id="gallery-full-image" alt="放大的商品图片" referrerpolicy="no-referrer"><p id="gallery-full-caption"></p></dialog>
 </body>
 </html>

@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from app.ai import AIError, generate, health
 from app.browser import BROWSER, BrowserCancelled, BrowserControl, browser_health
 from app.product import DEMO_TEXT, ProductError, canonical_url, fetch_product, manual_product
+from app.images import IMAGE_HOSTS
 
 ROOT = Path(__file__).resolve().parent
 JOBS = {}
@@ -76,7 +77,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        image_sources = ' '.join('https://' + host for host in sorted(IMAGE_HOSTS))
+        self.send_header("Content-Security-Policy", f"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: {image_sources}; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         self.end_headers()
         try:
             self.wfile.write(content)

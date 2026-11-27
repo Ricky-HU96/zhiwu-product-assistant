@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 let token = '', busy = false, lastData = null, timer = null, startedAt = 0, currentJob = null;
 let toastTimer;
 let selectedScriptIndex = 0, scriptDrafts = [], scriptEdits = [];
+let galleryImages = [], selectedImageIndex = 0;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -98,6 +99,7 @@ function renderProduct(product) {
   $('results').hidden = false;
   $('empty-state').hidden = true;
   $('result-title').textContent = product.title;
+  renderGallery(product);
   $('result-summary').textContent = '商品信息已整理，正在寻找适合短视频的内容角度。';
   const source = product.source_type;
   $('source-notice').className = `source-notice ${source}`;
@@ -112,7 +114,8 @@ function renderProduct(product) {
   const priceLabels = new Set(['页面价格', '页面报价范围', '已读取报价区间', '已确认售价区间', '仅获取起价']);
   const basics = product.facts.filter(fact => basicLabels.has(fact.label));
   const features = product.facts.filter(fact => /功能描述|功能要点/.test(fact.label));
-  const specs = product.facts.filter(fact => !basicLabels.has(fact.label) && !priceLabels.has(fact.label) && fact.label !== 'SKU 选项' && !features.includes(fact));
+  const descriptions = product.facts.filter(fact => /商品说明|图文详情/.test(fact.label));
+  const specs = product.facts.filter(fact => !basicLabels.has(fact.label) && !priceLabels.has(fact.label) && fact.label !== 'SKU 选项' && !features.includes(fact) && !descriptions.includes(fact));
   function properties(target, facts) {
     $(target).replaceChildren(...facts.map(fact => {
       const row = element('div');
@@ -124,7 +127,15 @@ function renderProduct(product) {
   properties('product-specs', specs);
   $('specs-block').hidden = !specs.length;
   $('product-features').replaceChildren(...features.map(fact => element('li', '', fact.value)));
-  $('features-block').hidden = !features.length;
+  $('features-block').hidden = !features.length && !descriptions.length;
+  $('product-description-details').hidden = !descriptions.length;
+  $('product-description-details').open = false;
+  $('product-description-label').textContent = `更多商品说明（${descriptions.length} 条）`;
+  $('product-descriptions').replaceChildren(...descriptions.map(fact => {
+    const item = element('div', 'fact-item');
+    item.append(element('span', 'fact-label', fact.label), element('p', 'fact-value', fact.value));
+    return item;
+  }));
   const variants = product.variants || [];
   $('variant-count').textContent = variants.length ? `${variants.length} 个已读取选项` : '未读取到选项';
   $('variants-overview').replaceChildren();
@@ -185,7 +196,86 @@ function renderProduct(product) {
   $('source-link').append(element('span', '', `${['page', 'browser'].includes(source) ? '获取' : '整理'}时间：${time}`));
 }
 
+function selectGalleryImage(index) {
+  selectedImageIndex = index;
+  const item = galleryImages[index];
+  if (!item) return;
+  $('gallery-main-image').src = item.url;
+  $('gallery-main-image').alt = `${item.id} · ${item.caption}`;
+  $('gallery-image-label').textContent = `${item.id} · ${index + 1} / ${galleryImages.length}`;
+  $('gallery-image-scope').textContent = item.scope;
+  $('gallery-thumbnails').querySelectorAll('button').forEach((button, i) => {
+    button.classList.toggle('selected', i === index);
+    button.setAttribute('aria-pressed', String(i === index));
+  });
+}
+
+function renderGallery(product) {
+  galleryImages = product.images || [];
+  $('gallery-empty').hidden = !!galleryImages.length;
+  $('product-gallery').hidden = !galleryImages.length;
+  $('visual-status').textContent = galleryImages.length ? '等待核对' : '未完成核对';
+  $('visual-coverage').textContent = `取得 ${galleryImages.length} 张商品图`;
+  $('visual-summary').textContent = galleryImages.length ? '图片已读取，正在核对图中配置与文字说明。' : '缺少图片输入，不能判断图文是否一致。';
+  $('visual-findings').replaceChildren();
+  $('gallery-thumbnails').replaceChildren(...galleryImages.map((item, index) => {
+    const button = element('button', 'gallery-thumbnail');
+    button.type = 'button';
+    button.setAttribute('aria-label', `查看商品图 ${item.id}`);
+    const image = element('img');
+    image.src = item.url; image.alt = item.id; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
+    button.append(image, element('span', '', item.id));
+    button.addEventListener('click', () => selectGalleryImage(index));
+    return button;
+  }));
+  selectGalleryImage(0);
+}
+
+function renderVisualReview(review, product) {
+  if (!review) return;
+  const count = product.vision_image_ids?.length || 0;
+  $('visual-status').textContent = review.status === 'unavailable' ? '未完成核对' : review.findings.length ? `${review.findings.length} 项需关注` : '所检图片暂无疑点';
+  $('visual-coverage').textContent = `已核对 ${count} / ${product.images?.length || 0} 张图`;
+  $('visual-summary').textContent = review.summary;
+  $('visual-findings').replaceChildren(...review.findings.map(item => {
+    const labels = {description_missing: '描述未说明 · 待确认', contradiction: '图文存在明确冲突', variant_uncertain: 'SKU / 展示范围待确认'};
+    const card = element('article', `visual-finding ${item.kind}`);
+    card.append(element('span', 'visual-kind', labels[item.kind]), element('h4', '', item.title));
+    [['图片观察', item.observation], ['文字对照', item.text_comparison], ['购买影响', item.impact], ['建议确认', item.action]].forEach(([label, value]) => {
+      const row = element('p'); row.append(element('strong', '', `${label}：`), document.createTextNode(value)); card.append(row);
+    });
+    const links = element('div', 'visual-image-links');
+    item.image_ids.forEach(id => {
+      const button = element('button', 'text-button', `查看图 ${id}`);
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        const index = galleryImages.findIndex(image => image.id === id);
+        if (index >= 0) selectGalleryImage(index);
+        $('product-gallery').scrollIntoView({behavior: 'smooth', block: 'start'});
+      });
+      links.append(button);
+    });
+    card.append(links);
+    if (item.text_evidence_ids.length) card.append(evidence(item.text_evidence_ids, '文字依据'));
+    return card;
+  }));
+}
+
+$('gallery-open').addEventListener('click', () => {
+  const image = galleryImages[selectedImageIndex];
+  if (!image) return;
+  $('gallery-full-image').src = image.url;
+  $('gallery-full-image').alt = image.caption;
+  $('gallery-full-caption').textContent = `${image.id} · ${image.scope}`;
+  $('image-dialog').showModal();
+});
+$('gallery-close').addEventListener('click', () => $('image-dialog').close());
+$('gallery-main-image').addEventListener('error', () => {
+  $('gallery-image-scope').textContent = '图片暂时无法加载，可切换其他图片或稍后重试。';
+});
+
 function renderAnalysis(result) {
+  renderVisualReview(result.visual_review, lastData.product);
   $('angles-section').hidden = false;
   $('script-section').hidden = false;
   $('result-summary').textContent = result.summary;
@@ -324,7 +414,11 @@ async function startAnalysis(demo = false) {
     sessionStorage.removeItem('zhiwu-job');
     showError(error.message);
     if ($('results').hidden) $('empty-state').hidden = false;
-    else $('result-summary').textContent = '商品资料已保留，本次内容生成未完成。';
+    else {
+      $('result-summary').textContent = '商品资料已保留，本次内容生成未完成。';
+      $('visual-status').textContent = '未完成核对';
+      $('visual-summary').textContent = '本次生成未完成，暂不能判断图文是否一致；仍可查看商品图片。';
+    }
   } finally {
     currentJob = null;
     setBusy(false);
