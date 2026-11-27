@@ -17,7 +17,9 @@ SHOT = obj({'visual': STRING, 'voiceover': STRING, 'evidence_ids': STRINGS})
 ANGLE = obj({key: STRING for key in ('audience', 'scenario', 'pain', 'feature', 'benefit', 'reason')}
             | {'evidence_ids': STRINGS, 'variant_ids': STRINGS})
 SCRIPT = obj({key: STRING for key in ('title', 'audience', 'scenario', 'hook', 'script')}
-             | {'variant_ids': STRINGS, 'script_evidence_ids': STRINGS, 'creator_notes': STRINGS, 'shots': {'type': 'array', 'items': SHOT}})
+             | {'product_identity': STRING, 'identity_evidence_ids': STRINGS,
+                'selling_points': {'type': 'array', 'items': obj({'phrase': STRING, 'evidence_ids': STRINGS})},
+                'variant_ids': STRINGS, 'script_evidence_ids': STRINGS, 'creator_notes': STRINGS, 'shots': {'type': 'array', 'items': SHOT}})
 SCHEMA = obj({
     'visual_review': VISUAL_SCHEMA,
     'summary': STRING,
@@ -48,6 +50,9 @@ def validate_result(result, product):
 
     facts = {f['id'] for f in product['facts']}
     variants = {v['id']: v for v in product.get('variants', [])}
+    normalize = lambda value: re.sub(r'\s+', '', value).casefold()
+    brand_facts = [f for f in product['facts'] if f['label'] == '品牌' and f['value'].strip()]
+    identity_facts = brand_facts or [f for f in product['facts'] if f['label'] in ('产品名称', '商品名称', '型号')] or product['facts'][:1]
 
     def refs(value, required=True):
         if not isinstance(value, list) or required and not value or any(not isinstance(item, str) or item not in facts for item in value):
@@ -102,6 +107,22 @@ def validate_result(result, product):
         if len(script['hook']) > 30 or not script['script'].startswith(script['hook']):
             fail('每版开场钩子必须位于口播开头，且不超过 30 字。')
         refs(script['script_evidence_ids']); sku_refs(script['variant_ids'], script['script_evidence_ids'])
+        identity = script['product_identity']
+        text(identity); refs(script['identity_evidence_ids'])
+        if len(normalize(identity)) < 2 or normalize(identity) not in normalize(script['script']):
+            fail('口播必须明确说出 product_identity 指定的具体品牌或商品名，不能只推荐品类。')
+        if not any(f['id'] in script['identity_evidence_ids'] and normalize(identity) in normalize(f['value']) for f in identity_facts):
+            fail('商品标识必须摘自已读品牌资料；无品牌时摘自商品名称，且引用对应事实，不能编造品牌或型号。')
+        if not set(script['identity_evidence_ids']).issubset(script['script_evidence_ids']):
+            fail('口播依据必须包含商品标识依据。')
+        count(script['selling_points'], 1, 3, '本版具体卖点')
+        for point in script['selling_points']:
+            shape(point, SCRIPT['properties']['selling_points']['items'])
+            text(point['phrase']); refs(point['evidence_ids'])
+            if normalize(point['phrase']) not in normalize(script['script']):
+                fail('本版卖点短句必须实际出现在口播正文中。')
+            if not set(point['evidence_ids']).issubset(script['script_evidence_ids']):
+                fail('口播依据必须包含卖点的事实依据。')
         count(script['shots'], 2, 4, '每版分镜')
         for shot in script['shots']:
             shape(shot, SHOT); text(shot['visual']); text(shot['voiceover']); refs(shot['evidence_ids'], False)
@@ -126,6 +147,9 @@ INSTRUCTION = """你是电商内容人员的商品理解与中文短视频口播
 8. 输出给电商内容创作者使用的“可直接拍摄的产品展示视频”。script和hook是创作者面对消费者说的自然台词：具体使用困扰→有事实依据的商品细节/演示动作→消费者能理解的收益。不能写成选购顾问劝顾客查资料、核对配置或决定下单的提醒。禁止“页面读取报价”“先别急着下单”“先问清供电接口”“确认配置后再决定”等表达；默认不在口播中报动态价格。内部缺失项、供电接口、随货线缆、SKU归属与素材核对写入每版creator_notes（1～3条），供创作者拍摄前处理，不混入hook、title、script。缺少某SKU的接口/性能依据，就不承诺它，围绕有依据的结构、外观或已确认的功能展示，不靠购买前提醒或“多一个选择”等空话凑满一版。不能将当前SKU的能力假定为其他SKU共性。不能三版只替换颜色名。引用具体 SKU 的口播必须在 script_evidence_ids 包含该 SKU 的事实编号；不提某个选项时可以为空 variant_ids。
 9. 每版 shots 给2～3个实际可拍的产品/使用镜头，如手部操作、结构特写、真实摆放与展开过程。不要用“展示商品页和报价”“拍摄顾客查看选购信息”替代产品演示；拍摄前条件写creator_notes。voiceover按顺序拼接必须等于该版完整script。涉及商品功能的镜头须有 evidence_ids，纯场景镜头可为空。
 10. limitations 给2～4条购买前需核对的缺失或限制。所有人群建议、场景、收益、风格偏好判断均为分析推断。优先参考用户指定受众，但不能把用户描述当成商品能力。
+16. 每版是在推销输入链接对应的这个具体商品。product_identity 从“品牌”事实摘取真实品牌名（去掉“访问/旗舰店”等页面套话）；无品牌资料时从商品名称摘取最可识别的短名称，无型号不能杜撰。identity_evidence_ids 引用该名称或品牌事实。正文必须自然说出这个标识，最好在钩子后首句带上产品类型及当前款式，例如“看看AICHESON这款12V笔记本散热垫”。不能通篇只称“这款散热垫/来瓶饮料”。不必照念冗长Amazon标题、ASIN或堆关键词。
+17. 先通读当前SKU的功能描述与参数，选出对本版受众有意义的2～3个具体卖点，资料不足可1个。selling_points 每项的phrase是正文中实际出现的一段连续短句，evidence_ids指向支持它的功能/规格原文，并纳入script_evidence_ids。按“具体困扰→点名商品→用参数/结构/功能说明为什么选它→场景收益/自然推荐”组织正文。数字要解释用途，非数字结构也可以成为卖点；不能把全文写成操作步骤、规格清单或“提供更多选择”的空话。
+18. 三版围绕同一具体商品针对不同人群/需求选用不同卖点组合，足够资料时按SKU细分。每版至少有一个可核对的具体细节，让其他同类商品名不能随便替换。不要声称这些功能为本品独有，不做无依据的竞品优劣或“最好/必买/保证降温”等承诺。卖家宣称的测试降温幅度、健康效果等未经独立验证，不直接当成保证；优先采用有依据的调节档位、尺寸范围、材质结构、容量等可展示信息。只用当前SKU已确认的参数。
 只输出 JSON，不要 Markdown。
 """
 INSTRUCTION += VISUAL_INSTRUCTION

@@ -43,6 +43,9 @@ AI_TIMEOUT_SECONDS=180
 
 macOS/Linux：使用 `.venv/bin/python`，以 `cp .env.example .env` 复制模板，并在安装依赖后运行 `python -m playwright install chromium`。可通过进程环境变量 `PRODUCT_BROWSER` 选择 `msedge`、`chrome` 或 `chromium`。
 
+
+口播会点明已读品牌（无品牌时使用商品短名称），优先选取与受众相关的2～3个具体功能或参数，转化为使用收益；网页单列每版卖点及其原文依据。不会以品类通用介绍代替这个商品的推介，也不会为其他 SKU 套用当前参数。程序检查商品标识是否有来源、是否出现在口播中，以及卖点短句和引用编号是否匹配；语义真实性与实际效果仍需创作者核对。
+
 ## AI 配置
 
 | 变量 | 用途 |

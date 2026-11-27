@@ -367,6 +367,12 @@ function renderScript(index) {
   $('script-edit-note').textContent = scriptEdits[index] ? '本版口播已修改，请重新核对字数、依据和镜头对应关系。' : '本版已通过字数与依据编号检查，发布前请核对商品描述。';
   updateCount();
   $('script-evidence').replaceChildren(evidence(script.script_evidence_ids, '本版使用的商品依据'));
+  $('script-product-identity').textContent = `本版推介：${script.product_identity || lastData.product.title}`;
+  $('script-selling-points').replaceChildren(...(script.selling_points || []).map(point => {
+    const row = element('div', 'script-selling-point');
+    row.append(element('p', '', point.phrase), evidence(point.evidence_ids, '商品依据'));
+    return row;
+  }));
   $('creator-notes-list').replaceChildren(...(script.creator_notes || []).map(note => element('li', '', note)));
   $('shots-list').replaceChildren();
   script.shots.forEach((shot, index) => {

@@ -86,9 +86,11 @@ class OutputTests(unittest.TestCase):
                                                 'evidence_ids': self.product['variants'][0]['evidence_ids']}],
                        'angles': [copy.deepcopy(angle) for _ in range(3)], 'limitations': ['防晒等级未提供', '折叠尺寸需确认'], 'scripts': []}
         for hook in ['球场边等孩子，怕晒？', '周末海边休息，怕晒？', '公园里坐一会儿，怕晒？']:
-            body = '这把椅子自带遮阳篷，展开就能坐着休息。'
+            body = '晴野带遮阳篷折叠露营椅自带遮阳篷，展开就能坐着休息。'
             self.result['scripts'].append({'title': hook, 'audience': '户外等候者', 'scenario': '等候', 'variant_ids': [],
-                                           'hook': hook, 'script': hook + body, 'script_evidence_ids': ['F3'], 'creator_notes': ['拍摄前核对实物遮阳篷结构。'],
+                                           'product_identity': '晴野', 'identity_evidence_ids': ['F1'],
+                                           'selling_points': [{'phrase': '自带遮阳篷', 'evidence_ids': ['F3']}],
+                                           'hook': hook, 'script': hook + body, 'script_evidence_ids': ['F1', 'F3'], 'creator_notes': ['拍摄前核对实物遮阳篷结构。'],
                                            'shots': [{'visual': '等候场景', 'voiceover': hook, 'evidence_ids': []},
                                                      {'visual': '展开篷子', 'voiceover': body, 'evidence_ids': ['F3']}]})
         for index in range(2):
@@ -145,6 +147,29 @@ class OutputTests(unittest.TestCase):
             validate_result(invalid, self.product)
         self.result['scripts'][0]['creator_notes'] = ['拍摄前先问清供电接口与随货线缆。']
         self.assertEqual(validate_result(self.result, self.product)['scripts'][0]['creator_notes'][0], '拍摄前先问清供电接口与随货线缆。')
+
+    def test_specific_product_identity_must_be_spoken_and_grounded(self):
+        for identity, spoken in [('晴野', False), ('不存在的品牌', True)]:
+            invalid = copy.deepcopy(self.result)
+            script = invalid['scripts'][0]
+            script['product_identity'] = identity
+            script['script'] = script['script'].replace('晴野', identity if spoken else '这款')
+            with self.subTest(identity=identity), self.assertRaises(ContentError):
+                validate_result(invalid, self.product)
+
+    def test_known_brand_cannot_be_replaced_with_category_identity(self):
+        self.product['facts'].append({'id': 'F90', 'label': '品牌', 'value': '晴野', 'evidence': '晴野'})
+        invalid = copy.deepcopy(self.result)
+        invalid['scripts'][0].update(product_identity='折叠露营椅', identity_evidence_ids=['F1'])
+        with self.assertRaisesRegex(ContentError, '商品标识'):
+            validate_result(invalid, self.product)
+
+    def test_selling_points_must_be_spoken_and_included_in_script_evidence(self):
+        for point in [{'phrase': '防水等级IPX8', 'evidence_ids': ['F3']}, {'phrase': '自带遮阳篷', 'evidence_ids': ['F2']}]:
+            invalid = copy.deepcopy(self.result)
+            invalid['scripts'][0]['selling_points'] = [point]
+            with self.subTest(point=point), self.assertRaises(ContentError):
+                validate_result(invalid, self.product)
 
 
 if __name__ == '__main__':
