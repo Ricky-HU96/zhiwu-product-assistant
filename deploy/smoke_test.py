@@ -25,7 +25,7 @@ def main(public=False):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
     def request(path, authenticated=True, data=None, extra=None):
-        headers = {'Host': settings['PUBLIC_HOST']}
+        headers = {'Host': settings['PUBLIC_HOST'], 'User-Agent': 'Zhiwu-Deployment-Check/1.0'}
         if authenticated:
             headers['Authorization'] = authorization
         if data is not None:
