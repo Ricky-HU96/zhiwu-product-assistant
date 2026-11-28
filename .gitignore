@@ -24,3 +24,5 @@ cookies*.json
 storage-state*.json
 .DS_Store
 Thumbs.db
+
+.secrets/

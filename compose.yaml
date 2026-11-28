@@ -1,0 +1,51 @@
+name: zhiwu
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,uid=10001,gid=10001
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 100
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/api/health',timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks: [private]
+  gateway:
+    image: nginx/nginx-unprivileged:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${GATEWAY_PORT:-18765}:8080"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST in .env}
+      GATEWAY_PORT: ${GATEWAY_PORT:-18765}
+      BIND_IP: ${BIND_IP:-127.0.0.1}
+      NGINX_ENVSUBST_FILTER: '^(PUBLIC_HOST|GATEWAY_PORT|BIND_IP)$$'
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./.secrets/htpasswd:/etc/nginx/auth/htpasswd:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,uid=101,gid=101
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m,uid=101,gid=101
+    mem_limit: 128m
+    pids_limit: 64
+    networks: [private]
+networks:
+  private:
+    driver: bridge

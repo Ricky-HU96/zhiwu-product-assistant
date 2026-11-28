@@ -14,7 +14,7 @@ def audit():
         rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
         rb'[A-Za-z]:[\\/]Users[\\/](?!Public\b|Default\b)[^\s"<>]+',
     ]
-    forbidden = {'.private', '.runtime', '.browser-profile', '.venv', 'artifacts', '.publish', '__pycache__', '.codex', '.agents'}
+    forbidden = {'.private', '.runtime', '.secrets', '.browser-profile', '.venv', 'artifacts', '.publish', '__pycache__', '.codex', '.agents'}
     issues = []
     count = 0
     for path in filter(None, paths):

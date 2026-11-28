@@ -191,8 +191,9 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="商品理解与口播助手")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--host", choices=('127.0.0.1', '0.0.0.0'), default='127.0.0.1', help='Use 0.0.0.0 only inside the private deployment network.')
     args = parser.parse_args()
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"\n商品理解与口播助手\nLocal: http://127.0.0.1:{server.server_port}\nAI：读取本地 .env 配置 · Ctrl+C 停止\n", flush=True)
     try:
         server.serve_forever()

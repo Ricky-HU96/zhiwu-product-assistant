@@ -1,0 +1,10 @@
+**
+!Dockerfile
+!server.py
+!app/
+!app/*.py
+!web/
+!web/*.html
+!web/*.css
+!web/*.js
+!web/*.svg
